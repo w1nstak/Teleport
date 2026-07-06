@@ -2,7 +2,7 @@
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 $remote = "https://git.msk0.amvera.ru/w1nst/teleport"
-$publicUrl = "https://teleport.w1nst.amvera.io"
+$publicUrl = "https://teleport-w1nst.amvera.io"
 
 function Find-Git {
     $candidates = @(

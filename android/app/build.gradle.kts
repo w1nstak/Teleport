@@ -41,7 +41,7 @@ fun resolveApiBaseUrl(): String {
             }
         }
     }
-    return "https://teleport.w1nst.amvera.io/"
+    return "https://teleport-w1nst.amvera.io/"
 }
 val apiBaseUrl: String = resolveApiBaseUrl()
 val googleServicesFile = file("google-services.json")

@@ -24,7 +24,7 @@ settings:
 
     CODE_SIGN_STYLE: Automatic
 
-    API_BASE_URL: https://teleport.w1nst.amvera.io/
+    API_BASE_URL: https://teleport-w1nst.amvera.io/
 
   configs:
 
