@@ -11,7 +11,7 @@ enum AppConfig {
         #if DEBUG
         return "http://127.0.0.1:8765/"
         #else
-        return "https://api.example.com/"
+        return "https://teleport.w1nst.amvera.io/"
         #endif
     }
 

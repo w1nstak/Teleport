@@ -1,3 +1,8 @@
+# Python
+server/__pycache__/
+**/__pycache__/
+*.pyc
+
 # Secrets & local data
 server/.env
 server/teleport.db
