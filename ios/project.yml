@@ -1,0 +1,35 @@
+name: Teleport
+options:
+  bundleIdPrefix: com.teleport
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    API_BASE_URL: https://api.example.com/
+  configs:
+    Debug:
+      API_BASE_URL: http://127.0.0.1:8765/
+targets:
+  Teleport:
+    type: application
+    platform: iOS
+    sources:
+      - path: Teleport
+        excludes:
+          - "**/.DS_Store"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.teleport.messenger
+        INFOPLIST_FILE: Teleport/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ENABLE_PREVIEWS: YES
+    entitlements:
+      path: Teleport/Teleport.entitlements
+

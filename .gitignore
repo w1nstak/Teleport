@@ -1,0 +1,25 @@
+# Secrets & local data
+server/.env
+server/teleport.db
+server/uploads/
+android/local.properties
+android/yandex.client.id
+android/telegram.bot.token
+*.apk
+
+# Build artifacts
+android/.gradle/
+android/app/build/
+android/build/
+**/.DS_Store
+
+# IDE
+.idea/
+*.iml
+
+# iOS (не нужен на сервере Amvera)
+ios/build/
+
+# Env local
+.env
+amvera.credentials

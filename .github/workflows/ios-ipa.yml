@@ -1,0 +1,47 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'teleport/ios/**'
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: teleport/ios
+        run: xcodegen generate
+
+      - name: Build for Simulator (CI smoke test)
+        working-directory: teleport/ios
+        run: |
+          xcodebuild \
+            -project Teleport.xcodeproj \
+            -scheme Teleport \
+            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -configuration Debug \
+            build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Archive (requires signing secrets)
+        if: ${{ secrets.DEVELOPMENT_TEAM != '' }}
+        working-directory: teleport/ios
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
+        run: |
+          chmod +x build_ipa.sh
+          ./build_ipa.sh
+
+      - name: Upload IPA artifact
+        if: ${{ secrets.DEVELOPMENT_TEAM != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Teleport-ipa
+          path: teleport/ios/build/ipa/*.ipa

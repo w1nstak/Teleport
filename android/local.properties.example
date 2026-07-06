@@ -1,0 +1,13 @@
+sdk.dir=C\:\\Users\\YOUR_USER\\AppData\\Local\\Android\\Sdk
+
+# Яндекс ID — Client ID с https://oauth.yandex.ru/ (или файл yandex.client.id)
+# yandex.client.id=ваш_client_id
+
+# Telegram Login — @BotFather + /setdomain
+# telegram.bot.username=YourBot
+# telegram.bot.token=123456:ABC...
+# telegram.auth.origin=https://ваш-домен.ru
+
+# URL облачного сервера (после деплоя — см. HOSTING.md)
+# api.base.url=https://api.ВАШ-ДОМЕН.ru/
+# Или задайте PUBLIC_URL в ../public_url.env и запустите setup_public_url.ps1

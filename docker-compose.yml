@@ -1,0 +1,22 @@
+services:
+  teleport:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    environment:
+      DATA_DIR: /data
+      WEB_DIR: /app/web
+      PORT: "8765"
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      SMS_PROVIDER: ${SMS_PROVIDER:-mock}
+    volumes:
+      - teleport_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  teleport_data:
