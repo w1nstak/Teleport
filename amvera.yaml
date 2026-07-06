@@ -1,13 +1,8 @@
 meta:
-  environment: python
+  environment: docker
   toolchain:
-    name: pip
-    version: "3.10"
-
-build:
-  requirementsPath: requirements.txt
+    name: docker
 
 run:
-  scriptName: app.py
   containerPort: 5000
   persistenceMount: /data
