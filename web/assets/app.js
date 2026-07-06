@@ -57,21 +57,22 @@ function str(key) {
 }
 
 function applyLabels() {
-  $("label-chats-title").textContent = str("chats_title");
-  $("label-nav-chats").textContent = str("nav_chats");
-  $("label-nav-profile").textContent = str("nav_profile");
-  $("label-nav-settings").textContent = str("nav_settings");
-  $("menu-search").textContent = str("search");
-  $("menu-archive").textContent = str("archive");
-  $("menu-read-all").textContent = str("read_all");
-  $("menu-select").textContent = str("select_chats");
-  $("label-locale-title").textContent = str("localization_title");
-  $("label-edit").textContent = str("edit_label");
-  $("locale-reset").textContent = str("reset");
-  $("edit-cancel").textContent = str("cancel");
-  $("edit-save").textContent = str("save");
-  $("message-input").placeholder = str("message_placeholder");
-  $("btn-nav-search").title = str("nav_search");
+  const set = (id, fn) => { const el = $(id); if (el) fn(el); };
+  set("label-chats-title", (el) => { el.textContent = str("chats_title"); });
+  set("label-nav-chats", (el) => { el.textContent = str("nav_chats"); });
+  set("label-nav-profile", (el) => { el.textContent = str("nav_profile"); });
+  set("label-nav-settings", (el) => { el.textContent = str("nav_settings"); });
+  set("menu-search", (el) => { el.textContent = str("search"); });
+  set("menu-archive", (el) => { el.textContent = str("archive"); });
+  set("menu-read-all", (el) => { el.textContent = str("read_all"); });
+  set("menu-select", (el) => { el.textContent = str("select_chats"); });
+  set("label-locale-title", (el) => { el.textContent = str("localization_title"); });
+  set("label-edit", (el) => { el.textContent = str("edit_label"); });
+  set("locale-reset", (el) => { el.textContent = str("reset"); });
+  set("edit-cancel", (el) => { el.textContent = str("cancel"); });
+  set("edit-save", (el) => { el.textContent = str("save"); });
+  set("message-input", (el) => { el.placeholder = str("message_placeholder"); });
+  set("btn-nav-search", (el) => { el.title = str("nav_search"); });
 }
 
 function renderLocaleList() {
