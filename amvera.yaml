@@ -3,6 +3,10 @@ meta:
   toolchain:
     name: docker
 
+build:
+  dockerfile: Dockerfile
+  skip: false
+
 run:
   containerPort: 5000
   persistenceMount: /data
