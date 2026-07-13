@@ -87,6 +87,12 @@ interface ChatDao {
     @Query("SELECT * FROM chats WHERE id = :id")
     suspend fun getById(id: String): ChatEntity?
 
+    @Query("SELECT * FROM chats WHERE isArchived = 0")
+    suspend fun getAllActive(): List<ChatEntity>
+
+    @Query("DELETE FROM chats WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(chat: ChatEntity)
 

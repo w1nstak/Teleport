@@ -14,9 +14,10 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        val darkBg = Color.parseColor("#050B18")
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+            statusBarStyle = SystemBarStyle.dark(darkBg),
+            navigationBarStyle = SystemBarStyle.dark(darkBg),
         )
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent { TeleportApp() }

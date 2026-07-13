@@ -3,6 +3,7 @@ package com.teleport.messenger.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.teleport.messenger.data.api.ApiErrors
 import com.teleport.messenger.auth.PhoneAuthHandler
 import com.teleport.messenger.auth.SmsAuthMode
 import com.teleport.messenger.auth.YandexAuthHelper
@@ -34,11 +35,22 @@ class TeleportViewModel(
     private val _lastSmsCode = MutableStateFlow<String?>(null)
     val lastSmsCode: StateFlow<String?> = _lastSmsCode
 
+    private val _isOwner = MutableStateFlow(false)
+    val isOwner: StateFlow<Boolean> = _isOwner
+
+    private val _adminStats = MutableStateFlow<com.teleport.messenger.data.api.AdminStatsDto?>(null)
+    val adminStats: StateFlow<com.teleport.messenger.data.api.AdminStatsDto?> = _adminStats
+
     private var pendingPhone: String? = null
     private var smsMode: SmsAuthMode = SmsAuthMode.LOCAL
 
     init {
         viewModelScope.launch { repo.initializeIfNeeded() }
+        viewModelScope.launch {
+            activeAccount.collect {
+                _isOwner.value = if (it != null) repo.adminCheck() else false
+            }
+        }
     }
 
     fun currentUser(): Flow<UserEntity?> = activeAccount.flatMapLatest { acc ->
@@ -70,15 +82,13 @@ class TeleportViewModel(
     fun loginByUsername(username: String, password: String, onSuccess: () -> Unit) = launch {
         repo.loginByUsername(username, password)
             .onSuccess { onSuccess() }
-            .onFailure { _error.value = it.message ?: "Ошибка входа" }
+            .onFailure { _error.value = ApiErrors.message(it) }
     }
 
     fun registerByUsername(displayName: String, username: String, password: String, onSuccess: () -> Unit) = launch {
-        _loading.value = true
         repo.registerByUsername(displayName, username, password)
             .onSuccess { onSuccess() }
-            .onFailure { _error.value = it.message ?: "Ошибка регистрации" }
-        _loading.value = false
+            .onFailure { _error.value = ApiErrors.message(it) }
     }
 
     val recentCalls = repo.observeRecentCalls().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -257,8 +267,10 @@ class TeleportViewModel(
         onDone()
     }
 
-    fun sendText(chatId: String, userId: String, text: String, replyTo: String? = null, hasSpoiler: Boolean = false) = launch {
-        repo.sendMessage(chatId, userId, MessageType.TEXT, text, replyToId = replyTo, hasSpoiler = hasSpoiler)
+    fun sendText(chatId: String, userId: String, text: String, replyTo: String? = null, hasSpoiler: Boolean = false) = launchQuiet {
+        runCatching {
+            repo.sendMessage(chatId, userId, MessageType.TEXT, text, replyToId = replyTo, hasSpoiler = hasSpoiler)
+        }.onFailure { _error.value = ApiErrors.message(it) }
     }
 
     fun sendMedia(
@@ -269,7 +281,7 @@ class TeleportViewModel(
         caption: String = "",
         durationMs: Long = 0L,
         replyTo: String? = null,
-    ) = launch {
+    ) = launchQuiet {
         repo.sendMessage(chatId, userId, type, caption, mediaUrl, replyToId = replyTo, durationMs = durationMs)
     }
 
@@ -283,107 +295,120 @@ class TeleportViewModel(
         durationMs: Long = 0L,
         replyTo: String? = null,
     ) = launch {
-        val url = repo.uploadMediaFile(file, mime) ?: file.toURI().toString()
-        repo.sendMessage(chatId, userId, type, caption, url, replyToId = replyTo, durationMs = durationMs)
+        val url = repo.uploadMediaFile(file, mime)
+        if (url == null) {
+            _error.value = "Не удалось загрузить файл на сервер"
+            return@launch
+        }
+        runCatching {
+            repo.sendMessage(chatId, userId, type, caption, url, replyToId = replyTo, durationMs = durationMs)
+        }.onFailure { _error.value = ApiErrors.message(it) }
     }
 
-    fun forwardMessage(messageId: String, toChatId: String, senderId: String) = launch {
+    fun forwardMessage(messageId: String, toChatId: String, senderId: String) = launchQuiet {
         repo.forwardMessage(messageId, toChatId, senderId)
     }
 
-    fun syncMessages() = launch {
+    fun syncMessages() = launchQuiet {
         repo.syncChatsFromServer()
         repo.syncMessagesFromServer()
     }
 
-    fun editMessage(id: String, text: String) = launch { repo.editMessage(id, text) }
-    fun deleteMessage(id: String) = launch { repo.deleteMessage(id) }
-    fun pinMessage(chatId: String, msgId: String) = launch { repo.pinMessage(chatId, msgId) }
-    fun addReaction(msgId: String, userId: String, emoji: String) = launch { repo.addReaction(msgId, userId, emoji) }
-    fun pinChat(id: String, pinned: Boolean) = launch { repo.pinChat(id, pinned) }
-    fun archiveChat(id: String, archived: Boolean) = launch { repo.archiveChat(id, archived) }
-    fun markRead(chatId: String) = launch { repo.markChatRead(chatId) }
-    fun markAllChatsRead() = launch { repo.markAllChatsRead() }
+    fun editMessage(id: String, text: String) = launchQuiet { repo.editMessage(id, text) }
+    fun deleteMessage(id: String) = launchQuiet { repo.deleteMessage(id) }
+    fun pinMessage(chatId: String, msgId: String) = launchQuiet { repo.pinMessage(chatId, msgId) }
+    fun addReaction(msgId: String, userId: String, emoji: String) = launchQuiet { repo.addReaction(msgId, userId, emoji) }
+    fun pinChat(id: String, pinned: Boolean) = launchQuiet { repo.pinChat(id, pinned) }
+    fun archiveChat(id: String, archived: Boolean) = launchQuiet { repo.archiveChat(id, archived) }
+    fun markRead(chatId: String) = launchQuiet { repo.markChatRead(chatId) }
+    fun markAllChatsRead() = launchQuiet { repo.markAllChatsRead() }
 
-    fun updateProfile(user: UserEntity) = launch { repo.updateProfile(user) }
+    fun updateProfile(user: UserEntity) = launchQuiet { repo.updateProfile(user) }
 
-    fun checkUsername(username: String, excludeId: String, callback: (Boolean) -> Unit) = launch {
+    fun checkUsername(username: String, excludeId: String, callback: (Boolean) -> Unit) = launchQuiet {
         callback(repo.checkUsernameAvailable(username, excludeId))
     }
 
-    fun searchUsers(query: String, callback: (List<UserEntity>) -> Unit) = launch {
+    fun searchUsers(query: String, callback: (List<UserEntity>) -> Unit) = launchQuiet {
         callback(repo.searchUsers(query))
     }
 
-    fun searchMessages(chatId: String, query: String, filter: String, callback: (List<MessageEntity>) -> Unit) = launch {
+    fun searchMessages(chatId: String, query: String, filter: String, callback: (List<MessageEntity>) -> Unit) = launchQuiet {
         callback(repo.searchMessages(chatId, query, filter))
     }
 
-    fun buyPremium(months: Int) = launch {
+    fun buyPremium(months: Int) = launchQuiet {
         activeAccount.value?.id?.let { repo.purchasePremium(it, months) }
     }
 
-    fun buyStars(amount: Long) = launch {
+    fun buyIskry(amount: Long) = buyStars(amount)
+
+    fun buyStars(amount: Long) = launchQuiet {
         currentUser().first()?.let { repo.buyStars(it.id, amount) }
     }
 
-    fun sendGift(toUserId: String, giftId: String, chatId: String, callback: (Boolean) -> Unit) = launch {
-        val user = currentUser().first() ?: return@launch
+    fun sendGift(toUserId: String, giftId: String, chatId: String, callback: (Boolean) -> Unit) = launchQuiet {
+        val user = currentUser().first() ?: return@launchQuiet
         callback(repo.sendGift(user.id, toUserId, giftId, chatId))
     }
 
-    fun buyListing(listingId: String, callback: (Boolean) -> Unit) = launch {
-        val user = currentUser().first() ?: return@launch
+    fun buyListing(listingId: String, callback: (Boolean) -> Unit) = launchQuiet {
+        val user = currentUser().first() ?: return@launchQuiet
         callback(repo.buyFromMarketplace(user.id, listingId))
     }
 
-    fun listGift(giftId: String, price: Long) = launch {
+    fun listGift(giftId: String, price: Long) = launchQuiet {
         currentUser().first()?.let { repo.listOnMarketplace(it.id, giftId, price) }
     }
 
-    fun updateSettings(settings: AppSettingsEntity) = launch { repo.updateSettings(settings) }
-    fun blockUser(userId: String) = launch { activeAccount.value?.id?.let { repo.blockUser(it, userId) } }
-    fun unblockUser(userId: String) = launch { activeAccount.value?.id?.let { repo.unblockUser(it, userId) } }
-    fun loadUsers(ids: List<String>, callback: (List<UserEntity>) -> Unit) = launch {
+    fun updateSettings(settings: AppSettingsEntity) = launchQuiet { repo.updateSettings(settings) }
+    fun blockUser(userId: String) = launchQuiet { activeAccount.value?.id?.let { repo.blockUser(it, userId) } }
+    fun unblockUser(userId: String) = launchQuiet { activeAccount.value?.id?.let { repo.unblockUser(it, userId) } }
+    fun loadUsers(ids: List<String>, callback: (List<UserEntity>) -> Unit) = launchQuiet {
         callback(repo.loadUsersByIds(ids))
     }
-    fun report(userId: String?, msgId: String?, reason: String) = launch {
+    fun report(userId: String?, msgId: String?, reason: String) = launchQuiet {
         currentUser().first()?.let { repo.report(it.id, userId, msgId, reason, "") }
     }
 
-    fun getContactForChat(chatId: String, currentUserId: String, callback: (UserEntity?) -> Unit) = launch {
+    fun getContactForChat(chatId: String, currentUserId: String, callback: (UserEntity?) -> Unit) = launchQuiet {
         callback(repo.getContactForChat(chatId, currentUserId))
     }
 
-    fun muteChat(chatId: String, muted: Boolean) = launch { repo.muteChat(chatId, muted) }
-    fun clearChat(chatId: String) = launch { repo.clearChat(chatId) }
+    fun muteChat(chatId: String, muted: Boolean) = launchQuiet { repo.muteChat(chatId, muted) }
+    fun clearChat(chatId: String) = launchQuiet { repo.clearChat(chatId) }
 
     fun switchAccount(accountId: String, onDone: () -> Unit) = launch {
         repo.switchAccount(accountId)
         onDone()
     }
 
-    fun terminateSession(sessionId: String) = launch { repo.terminateSession(sessionId) }
+    fun terminateSession(sessionId: String) = launchQuiet { repo.terminateSession(sessionId) }
 
-    fun openPrivateChat(otherUserId: String, callback: (String) -> Unit) = launch {
-        val me = currentUser().first() ?: return@launch
+    fun openPrivateChat(otherUserId: String, callback: (String) -> Unit) = launchQuiet {
+        val me = currentUser().first() ?: return@launchQuiet
         callback(repo.openOrCreatePrivateChat(me.id, otherUserId))
     }
 
-    fun createFolder(name: String, color: Int = 0xFF1565FF.toInt()) = launch {
+    fun openSavedChat(callback: (String) -> Unit) = launchQuiet {
+        val me = currentUser().first() ?: return@launchQuiet
+        callback(repo.ensureSavedChatForUser(me.id))
+    }
+
+    fun createFolder(name: String, color: Int = 0xFF1565FF.toInt()) = launchQuiet {
         activeAccount.value?.id?.let { repo.createFolder(it, name, color) }
     }
 
-    fun moveChatToFolder(chatId: String, folderId: String?) = launch {
+    fun moveChatToFolder(chatId: String, folderId: String?) = launchQuiet {
         repo.moveChatToFolder(chatId, folderId)
     }
 
-    fun startCall(chatId: String, type: String, isGroup: Boolean = false) = launch {
+    fun startCall(chatId: String, type: String, isGroup: Boolean = false) = launchQuiet {
         currentUser().first()?.let { repo.startCall(chatId, it.id, type, isGroup) }
     }
 
-    fun transcribe(msgId: String, callback: (String?) -> Unit) = launch {
-        val user = currentUser().first() ?: return@launch
+    fun transcribe(msgId: String, callback: (String?) -> Unit) = launchQuiet {
+        val user = currentUser().first() ?: return@launchQuiet
         callback(repo.transcribeVoice(msgId, user.id))
     }
 
@@ -401,11 +426,29 @@ class TeleportViewModel(
         }
     }
 
+    private fun launchQuiet(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try { block() } catch (e: Exception) {
+                _error.value = ApiErrors.message(e)
+            }
+        }
+    }
+
     private fun launch(block: suspend () -> Unit) {
         viewModelScope.launch {
             _loading.value = true
             try { block() } finally { _loading.value = false }
         }
+    }
+
+    fun loadAdminStats() = launch {
+        repo.adminStats()
+            .onSuccess { _adminStats.value = it }
+            .onFailure {
+                if (_adminStats.value == null) {
+                    _error.value = it.message ?: "Ошибка загрузки статистики"
+                }
+            }
     }
 
     class Factory(

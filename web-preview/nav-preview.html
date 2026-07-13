@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teleport — навигация</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+  :root{
+    --bg: #0E0D12;
+    --text: #F4F2FA;
+    --text-dim: #837E92;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:#050508;
+    font-family:'Inter',sans-serif;
+    display:flex;
+    justify-content:center;
+    padding:32px 12px;
+    min-height:100vh;
+  }
+  .phone{
+    width:360px;
+    height:640px;
+    background:
+      radial-gradient(70% 50% at 50% 100%, rgba(124,108,245,.10), transparent 70%),
+      var(--bg);
+    border-radius:36px;
+    overflow:hidden;
+    box-shadow:0 0 0 8px #000, 0 24px 70px rgba(0,0,0,.65);
+    color:var(--text);
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+  .hint{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--text-dim);
+    font-size:14px;
+    padding:24px;
+    text-align:center;
+  }
+  .navbar-wrap{
+    padding:0 20px 26px;
+    display:flex;
+    justify-content:center;
+  }
+  .navbar{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    padding:7px;
+    border-radius:999px;
+    background:rgba(255,255,255,.04);
+    backdrop-filter:blur(18px);
+    border:1px solid rgba(255,255,255,.1);
+    box-shadow:0 20px 44px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.06) inset;
+  }
+  .nav-item{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    padding:10px 15px;
+    border-radius:999px;
+    color:var(--text-dim);
+    font-size:12.5px;
+    font-weight:500;
+    border:1px solid transparent;
+    cursor:pointer;
+    transition:padding .3s cubic-bezier(.4,0,.2,1), color .3s ease;
+  }
+  .nav-item svg{width:19px;height:19px;flex-shrink:0;transition:transform .3s;}
+  .nav-item .label{
+    max-width:0;overflow:hidden;white-space:nowrap;opacity:0;
+    transition:max-width .3s ease, opacity .25s ease;
+  }
+  .nav-item.active{
+    color:#fff;
+    background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.22);
+    box-shadow:0 8px 20px rgba(0,0,0,.3), 0 1px 0 rgba(255,255,255,.15) inset;
+    padding:10px 18px 10px 13px;
+  }
+  .nav-item.active svg{transform:scale(1.05);}
+  .nav-item.active .label{max-width:90px;opacity:1;}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="hint">Нижняя навигация как в приложении<br><small style="opacity:.7">кликните вкладки</small></div>
+  <div class="navbar-wrap">
+    <div class="navbar" id="nav">
+      <div class="nav-item" data-tab="contacts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.4"/><path d="M3.5 20c0-3.2 2.5-5.5 5.5-5.5s5.5 2.3 5.5 5.5"/><circle cx="17" cy="8.5" r="2.6"/><path d="M15.5 14.7c2.6.4 4.5 2.4 4.5 5.3"/></svg>
+        <span class="label">Контакты</span>
+      </div>
+      <div class="nav-item active" data-tab="chats">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12c0 4-3.8 7-8.5 7-1 0-2-.13-2.9-.38L4 20l1.15-3.4C4.42 15.4 4 13.75 4 12c0-4 3.8-7 8.5-7S20 8 20 12Z"/><circle cx="8.7" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="15.3" cy="12" r=".9" fill="currentColor" stroke="none"/></svg>
+        <span class="label">Чаты</span>
+      </div>
+      <div class="nav-item" data-tab="settings">
+        <!-- шестерёнка -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="label">Настройки</span>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

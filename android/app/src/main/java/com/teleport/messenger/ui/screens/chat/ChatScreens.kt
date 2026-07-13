@@ -4,10 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -15,7 +13,9 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.teleport.messenger.data.entity.ChatType
 import com.teleport.messenger.data.entity.MessageType
 import com.teleport.messenger.ui.components.*
@@ -31,56 +31,26 @@ fun ChatListScreen(
     onChatClick: (String) -> Unit,
     onChats: () -> Unit,
     onContacts: () -> Unit,
-    onProfile: () -> Unit,
     onSettings: () -> Unit,
-    onCalls: () -> Unit,
     onArchive: () -> Unit,
     onSearch: () -> Unit,
 ) {
     val chats by vm.chats.collectAsState()
-    val folders by vm.folders().collectAsState(initial = emptyList())
     var query by remember { mutableStateOf("") }
-    var showSearch by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
+    var filter by remember { mutableStateOf(ChatListFilter.All) }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
-    var selectedFolder by remember { mutableStateOf<String?>(null) }
-    val filtered = remember(chats, query, selectedFolder) {
-        var list = if (selectedFolder == null) {
-            chats.filter { it.type != ChatType.SAVED && !it.isArchived }
-        } else {
-            chats.filter { it.folderId == selectedFolder }
-        }
-        if (query.isNotBlank()) list = list.filter { it.title.contains(query, true) }
-        list
-    }
-
-    val colors = TeleportAppTheme.colors
+    val filtered = remember(chats, query, filter) { filterChatsV6(chats, query, filter) }
     var menuChat by remember { mutableStateOf<com.teleport.messenger.data.entity.ChatEntity?>(null) }
 
     Scaffold(
-        containerColor = colors.screenBg,
-        floatingActionButton = {
-            if (!selectionMode) {
-                FloatingActionButton(
-                    onClick = onSearch,
-                    containerColor = colors.accentBlue,
-                    contentColor = Color.White,
-                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
-                    shape = CircleShape,
-                ) {
-                    Icon(Icons.Default.Create, appStr(AppStringKey.NEW_CHAT), modifier = Modifier.size(22.dp))
-                }
-            }
-        },
+        containerColor = ChatListV6Palette.Bg,
         bottomBar = {
             AppFloatingBottomNav(
                 selected = MainTab.Chats,
                 onChats = onChats,
                 onContacts = onContacts,
-                onProfile = onProfile,
                 onSettings = onSettings,
-                onCalls = onCalls,
             )
         },
     ) { padding ->
@@ -88,41 +58,40 @@ fun ChatListScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(colors.screenBg),
+                .background(ChatListV6Palette.Bg),
         ) {
-            ChatMessagesHeader(
-                title = if (selectionMode) appStr(AppStringKey.SELECT_CHATS)
-                else appStr(AppStringKey.CHATS_TITLE),
-                selectionMode = selectionMode,
-                onDone = if (selectionMode) {{ selectionMode = false; selectedIds = emptySet() }} else null,
-                onMenu = if (!selectionMode) {{ showMenu = true }} else null,
-                showSearchField = showSearch,
-                query = query,
-                onQueryChange = { query = it },
-            )
-            if (folders.isNotEmpty()) {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+            if (selectionMode) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 ) {
-                    item {
-                        FilterChip(
-                            selected = selectedFolder == null,
-                            onClick = { selectedFolder = null },
-                            label = { Text(appStr(AppStringKey.ALL_CHATS)) },
-                        )
-                    }
-                    items(folders, key = { it.id }) { folder ->
-                        FilterChip(
-                            selected = selectedFolder == folder.id,
-                            onClick = { selectedFolder = folder.id },
-                            label = { Text(folder.name) },
-                        )
+                    Text(
+                        appStr(AppStringKey.SELECT_CHATS),
+                        fontSize = 18.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        color = ChatListV6Palette.TextPrimary,
+                    )
+                    TextButton(onClick = { selectionMode = false; selectedIds = emptySet() }) {
+                        Text(appStr(AppStringKey.DONE), color = ChatListV6Palette.NavActive)
                     }
                 }
+            } else {
+                ChatListV6TopBar(
+                    query = query,
+                    onQueryChange = { query = it },
+                    onCompose = onSearch,
+                )
+                ChatListV6Filters(filter) { filter = it }
             }
-            LazyColumn(Modifier.fillMaxSize()) {
-                items(filtered, key = { it.id }) { chat ->
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 10.dp, end = 10.dp, bottom = 24.dp),
+            ) {
+                items(filtered.size, key = { filtered[it].id }) { index ->
+                    val chat = filtered[index]
                     val selected = chat.id in selectedIds
                     Row(
                         Modifier.fillMaxWidth(),
@@ -134,20 +103,22 @@ fun ChatListScreen(
                                 onCheckedChange = { checked ->
                                     selectedIds = if (checked) selectedIds + chat.id else selectedIds - chat.id
                                 },
-                                modifier = Modifier.padding(start = 12.dp),
+                                modifier = Modifier.padding(start = 4.dp),
+                                colors = CheckboxDefaults.colors(checkedColor = ChatListV6Palette.NavActive),
                             )
                         }
-                        ChatListItem(
-                            chat,
-                            {
+                        ChatListV6Item(
+                            chat = chat,
+                            index = index,
+                            onClick = {
                                 if (selectionMode) {
                                     selectedIds = if (selected) selectedIds - chat.id else selectedIds + chat.id
                                 } else {
                                     onChatClick(chat.id)
                                 }
                             },
-                            modifier = Modifier.weight(1f),
                             onLongClick = if (!selectionMode) {{ menuChat = chat }} else null,
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -155,17 +126,8 @@ fun ChatListScreen(
         }
     }
 
-    if (showMenu) {
-        ChatListMenuSheet(
-            onDismiss = { showMenu = false },
-            onSearch = { showSearch = true },
-            onArchive = onArchive,
-            onReadAll = { vm.markAllChatsRead() },
-            onSelectChats = { selectionMode = true },
-        )
-    }
-
     menuChat?.let { chat ->
+        val folders by vm.folders().collectAsState(initial = emptyList())
         AlertDialog(
             onDismissRequest = { menuChat = null },
             title = { Text(chat.title) },
@@ -176,6 +138,12 @@ fun ChatListScreen(
                     }
                     TextButton(onClick = { vm.archiveChat(chat.id, true); menuChat = null }) {
                         Text("В архив")
+                    }
+                    TextButton(onClick = { selectionMode = true; menuChat = null }) {
+                        Text(appStr(AppStringKey.SELECT_CHATS))
+                    }
+                    TextButton(onClick = { vm.markAllChatsRead(); menuChat = null }) {
+                        Text(appStr(AppStringKey.READ_ALL))
                     }
                     if (folders.isNotEmpty()) {
                         folders.forEach { folder ->

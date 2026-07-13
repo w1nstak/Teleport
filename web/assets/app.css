@@ -643,6 +643,17 @@ body {
   cursor: pointer;
 }
 .settings-row:hover { background: var(--surface-2); }
+.settings-row.admin-row { color: #af52de; font-weight: 600; }
+
+.admin-modal-card { max-width: 420px; }
+.admin-stats { padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+.admin-stat {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+.admin-stat-label { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.admin-stat-value { font-size: 22px; font-weight: 700; color: var(--text); word-break: break-all; }
 
 @media (max-width: 768px) {
   .main-view { grid-template-columns: 1fr; }

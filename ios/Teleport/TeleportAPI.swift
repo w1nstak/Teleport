@@ -112,6 +112,14 @@ final class TeleportAPI {
     func sendMessage(token: String, chatId: String, text: String) async throws -> MessageDto {
         try await request("messages/send", method: "POST", token: token, body: SendMessageRequest(chatId: chatId, type: "TEXT", text: text))
     }
+
+    func adminCheck(token: String) async throws -> AdminCheckDto {
+        try await request("admin/check", token: token)
+    }
+
+    func adminStats(token: String) async throws -> AdminStatsDto {
+        try await request("admin/stats", token: token)
+    }
 }
 
 struct EmptyResponse: Codable {}

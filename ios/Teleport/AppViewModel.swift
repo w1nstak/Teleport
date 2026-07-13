@@ -15,6 +15,8 @@ final class AppViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var settings = AppSettings()
     @Published var recentCalls: [CallRecord] = []
+    @Published var isOwner = false
+    @Published var adminStats: AdminStatsDto?
 
     private let api = TeleportAPI.shared
     private let ws = WebSocketClient()
@@ -83,14 +85,41 @@ final class AppViewModel: ObservableObject {
         self.token = token
         UserDefaults.standard.set(token, forKey: tokenKey)
         user = try await api.me(token: token)
+        await refreshOwnerStatus()
         try await loadChats()
         ws.connect(token: token)
+    }
+
+    func refreshOwnerStatus() async {
+        guard let token else {
+            isOwner = false
+            return
+        }
+        do {
+            let check = try await api.adminCheck(token: token)
+            isOwner = check.isOwner
+        } catch {
+            isOwner = false
+        }
+    }
+
+    func loadAdminStats() async {
+        guard let token, isOwner else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            adminStats = try await api.adminStats(token: token)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func logout() {
         ws.disconnect()
         token = nil
         user = nil
+        isOwner = false
+        adminStats = nil
         chats = []
         messages = []
         currentChatId = nil

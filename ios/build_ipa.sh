@@ -46,5 +46,14 @@ xcodebuild \
   -exportOptionsPlist exportOptions.plist \
   "${SIGN_ARGS[@]}"
 
-echo ""
-echo "Готово: $IPA_DIR/Teleport.ipa"
+ROOT_IPA="$(cd .. && pwd)/Teleport.ipa"
+if compgen -G "$IPA_DIR"/*.ipa > /dev/null; then
+  cp "$IPA_DIR"/*.ipa "$ROOT_IPA"
+  echo ""
+  echo "Готово:"
+  echo "  $IPA_DIR/Teleport.ipa"
+  echo "  $ROOT_IPA"
+else
+  echo ""
+  echo "Готово: $IPA_DIR/"
+fi

@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,8 +37,6 @@ fun SettingsScreen(
     vm: TeleportViewModel,
     onChats: () -> Unit,
     onContacts: () -> Unit,
-    onProfile: () -> Unit,
-    onCalls: () -> Unit,
     onFavorites: () -> Unit,
     onAppearance: () -> Unit,
     onStickers: () -> Unit,
@@ -47,93 +47,197 @@ fun SettingsScreen(
     onSessions: () -> Unit,
     onNotifications: () -> Unit,
     onBlocked: () -> Unit,
+    onSecurity: () -> Unit,
+    onAccounts: () -> Unit,
+    onPremium: () -> Unit,
+    onStars: () -> Unit,
+    onHelp: () -> Unit,
+    onLogout: () -> Unit,
+    onAdmin: () -> Unit,
 ) {
     val settings by vm.settings().collectAsState(initial = null)
-    val colors = TeleportAppTheme.colors
+    val user by vm.currentUser().collectAsState(initial = null)
+    val isOwner by vm.isOwner.collectAsState()
+    val showAdmin = isOwner || isOwnerUsername(user?.username)
     var notificationsOn by remember(settings) { mutableStateOf(settings?.notificationsEnabled ?: true) }
-    var powerSaving by remember(settings) { mutableStateOf(settings?.powerSavingEnabled ?: false) }
 
     fun save(block: (AppSettingsEntity) -> AppSettingsEntity) {
         settings?.let { vm.updateSettings(block(it)) }
     }
 
-    SettingsScreenScaffold(
+    val accountRows = buildList {
+        add(
+            SettingsV6Row(
+                icon = Icons.Outlined.Person,
+                gradStart = Color(0xFF5FA8FF),
+                gradEnd = Color(0xFF2E5FE0),
+                title = "Профиль",
+                onClick = onEditProfile,
+            ),
+        )
+        add(
+            SettingsV6Row(
+                icon = Icons.Outlined.Shield,
+                gradStart = Color(0xFF7C6FFF),
+                gradEnd = Color(0xFF4A3AD6),
+                title = "Конфиденциальность",
+                onClick = onPrivacy,
+            ),
+        )
+        add(
+            SettingsV6Row(
+                icon = Icons.Outlined.Notifications,
+                gradStart = Color(0xFFFF9F5F),
+                gradEnd = Color(0xFFE0692E),
+                title = "Уведомления",
+                toggle = notificationsOn,
+                onToggle = {
+                    notificationsOn = it
+                    save { s -> s.copy(notificationsEnabled = it) }
+                },
+            ),
+        )
+        add(
+            SettingsV6Row(
+                icon = Icons.AutoMirrored.Outlined.Chat,
+                gradStart = Color(0xFF4FD9A8),
+                gradEnd = Color(0xFF1FA878),
+                title = "Чаты",
+                onClick = onFolders,
+            ),
+        )
+        add(
+            SettingsV6Row(
+                icon = Icons.Outlined.Storage,
+                gradStart = Color(0xFF5FD1FF),
+                gradEnd = Color(0xFF2E9EE0),
+                title = "Хранилище",
+                value = "2.4/5 ГБ",
+                onClick = onFolders,
+            ),
+        )
+    }
+
+    val appearanceRows = listOf(
+        SettingsV6Row(
+            icon = Icons.Outlined.DarkMode,
+            gradStart = Color(0xFFB18BFF),
+            gradEnd = Color(0xFF7A52E0),
+            title = "Тема",
+            value = themeModeLabel(settings?.themeMode ?: "dark"),
+            onClick = onAppearance,
+        ),
+        SettingsV6Row(
+            icon = Icons.Outlined.Image,
+            gradStart = Color(0xFFFF7CB8),
+            gradEnd = Color(0xFFE03E85),
+            title = "Обои чатов",
+            onClick = onAppearance,
+        ),
+        SettingsV6Row(
+            icon = Icons.Outlined.Tune,
+            gradStart = Color(0xFF5FD1FF),
+            gradEnd = Color(0xFF2E9EE0),
+            title = "Размер шрифта",
+            value = "Средний",
+            onClick = onLocalization,
+        ),
+    )
+
+    val supportRows = listOf(
+        SettingsV6Row(
+            icon = Icons.Outlined.HelpOutline,
+            gradStart = Color(0xFF8280B4),
+            gradEnd = Color(0xFF5C5A88),
+            title = "Центр помощи",
+            onClick = onHelp,
+        ),
+        SettingsV6Row(
+            icon = Icons.Outlined.Info,
+            gradStart = Color(0xFF8280B4),
+            gradEnd = Color(0xFF5C5A88),
+            title = "О приложении",
+            onClick = onHelp,
+        ),
+        SettingsV6Row(
+            icon = Icons.Outlined.PersonAdd,
+            gradStart = Color(0xFF5FA8FF),
+            gradEnd = Color(0xFF2E5FE0),
+            title = "Пригласить друзей",
+            onClick = onContacts,
+        ),
+    )
+
+    Scaffold(
+        containerColor = SettingsV6Palette.Bg,
         bottomBar = {
             AppFloatingBottomNav(
                 selected = MainTab.Settings,
                 onChats = onChats,
                 onContacts = onContacts,
-                onProfile = onProfile,
                 onSettings = {},
-                onCalls = onCalls,
             )
         },
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(22.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(SettingsV6Palette.Bg),
+            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
+            item { SettingsV6Title(appStr(AppStringKey.SETTINGS)) }
             item {
-                Text(
-                    appStr(AppStringKey.SETTINGS),
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+                SettingsV6ProfileCard(
+                    initials = profileInitials(user?.displayName ?: user?.username ?: "?"),
+                    name = "Мой профиль",
+                    username = user?.username,
+                    onClick = onEditProfile,
+                    modifier = Modifier.padding(bottom = 16.dp),
                 )
             }
             item {
-                SettingsGroupCard {
-                    SettingsRow(Icons.Default.Star, Color(0xFF007AFF), "Избранное", onFavorites, showDivider = false)
-                }
+                SettingsV6GroupLabel("АККАУНТ")
+                SettingsV6GroupCard(accountRows)
+                Spacer(Modifier.height(20.dp))
             }
-            item {
-                SettingsGroupCard {
-                    SettingsRow(Icons.Default.Palette, Color(0xFFAF52DE), "Темы", onAppearance)
-                    SettingsRow(Icons.Default.EmojiEmotions, Color(0xFFFFCC00), "Эмодзи и стикеры", onStickers)
-                    SettingsRow(Icons.Default.GridView, Color(0xFF5AC8FA), "Навигация", onLocalization)
-                    SettingsRow(Icons.Default.Person, Color(0xFF007AFF), "Профиль", onEditProfile)
-                    SettingsRow(Icons.Default.Folder, Color(0xFFFF9500), "Папки", onFolders)
-                    SettingsRow(Icons.Default.Lock, Color(0xFF34C759), "Конфиденциальность", onPrivacy)
-                    SettingsRow(Icons.Default.Language, Color(0xFF007AFF), "Язык", onLocalization, showDivider = false)
-                }
-            }
-            item {
-                SettingsGroupCard {
-                    SettingsRow(Icons.Default.Devices, Color(0xFF5856D6), "Устройства", onSessions)
-                    SettingsToggleRow(
-                        Icons.Default.Notifications,
-                        Color(0xFFFF3B30),
-                        "Уведомления",
-                        notificationsOn,
-                        onCheckedChange = {
-                            notificationsOn = it
-                            save { s -> s.copy(notificationsEnabled = it) }
-                        },
+            if (showAdmin) {
+                item {
+                    SettingsV6GroupLabel("АДМИНИСТРИРОВАНИЕ")
+                    SettingsV6GroupCard(
+                        listOf(
+                            SettingsV6Row(
+                                icon = Icons.Outlined.Apps,
+                                gradStart = Color(0xFFFF6F9F),
+                                gradEnd = Color(0xFFD6316E),
+                                title = "Админ-панель",
+                                onClick = onAdmin,
+                            ),
+                        ),
                     )
-                    SettingsToggleRow(
-                        Icons.Default.Bolt,
-                        Color(0xFF34C759),
-                        "Энергосбережение",
-                        powerSaving,
-                        onCheckedChange = {
-                            powerSaving = it
-                            save { s -> s.copy(powerSavingEnabled = it) }
-                        },
-                    )
-                    SettingsRow(Icons.Default.Block, Color(0xFFFF9500), "Заблокированные", onBlocked, showDivider = false)
+                    Spacer(Modifier.height(20.dp))
                 }
             }
             item {
-                TextButton(
-                    onClick = onNotifications,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Подробные настройки уведомлений", color = colors.accentBlue)
-                }
+                SettingsV6BalanceCard(
+                    balance = user?.starsBalance ?: 0L,
+                    onTopUp = onStars,
+                    modifier = Modifier.padding(bottom = 20.dp),
+                )
             }
-            item { Spacer(Modifier.height(72.dp)) }
+            item {
+                SettingsV6GroupLabel("ОФОРМЛЕНИЕ")
+                SettingsV6GroupCard(appearanceRows)
+                Spacer(Modifier.height(20.dp))
+            }
+            item {
+                SettingsV6GroupLabel("ПОДДЕРЖКА")
+                SettingsV6GroupCard(supportRows)
+                Spacer(Modifier.height(20.dp))
+            }
+            item { SettingsV6Logout(onLogout) }
+            item { Spacer(Modifier.height(8.dp)) }
         }
     }
 }
@@ -156,15 +260,15 @@ fun AppearanceScreen(vm: TeleportViewModel, onBack: () -> Unit) {
         }
     }
 
-    Scaffold(containerColor = TeleportAppTheme.colors.screenBg) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            TeleportTopBar("Оформление", onBack)
+    Scaffold(containerColor = SettingsV6Palette.Bg) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).background(SettingsV6Palette.Bg)) {
+            SettingsV6SubTopBar("Оформление", onBack)
             LazyColumn(
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 item {
-                    Text("Тема приложения", fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
+                    Text("Тема приложения", fontWeight = FontWeight.SemiBold, color = SettingsV6Palette.TextPrimary)
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         ThemeModeCard(
@@ -217,18 +321,20 @@ fun AppearanceScreen(vm: TeleportViewModel, onBack: () -> Unit) {
                     }
                 }
                 item {
-                    Text("Акцентный цвет", fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
+                    Text("Акцентный цвет", fontWeight = FontWeight.SemiBold, color = SettingsV6Palette.TextPrimary)
                 }
                 items(ColorThemes) { theme ->
                     val selected = colorId == theme.id
-                    SettingsGroupCard {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable { colorId = theme.id; applyTheme(color = theme.id) }
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(SettingsV6Palette.CardBg)
+                            .border(1.dp, SettingsV6Palette.CardBorder, RoundedCornerShape(16.dp))
+                            .clickable { colorId = theme.id; applyTheme(color = theme.id) }
+                            .padding(16.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 Modifier
                                     .size(36.dp)
@@ -236,9 +342,9 @@ fun AppearanceScreen(vm: TeleportViewModel, onBack: () -> Unit) {
                                     .background(theme.primary),
                             )
                             Spacer(Modifier.width(14.dp))
-                            Text(theme.name, modifier = Modifier.weight(1f), color = colors.textPrimary)
+                            Text(theme.name, modifier = Modifier.weight(1f), color = SettingsV6Palette.TextPrimary)
                             if (selected) {
-                                Icon(Icons.Default.CheckCircle, null, tint = colors.accentBlue)
+                                Icon(Icons.Default.CheckCircle, null, tint = SettingsV6Palette.ToggleOnStart)
                             }
                         }
                     }
@@ -259,12 +365,12 @@ private fun ThemeModeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val borderColor = if (selected) TeleportAppTheme.colors.accentBlue else Color.Transparent
+    val borderColor = if (selected) SettingsV6Palette.ToggleOnStart else Color.Transparent
     Column(
         modifier
             .clip(RoundedCornerShape(20.dp))
             .border(2.dp, borderColor, RoundedCornerShape(20.dp))
-            .background(TeleportAppTheme.colors.cardBg)
+            .background(SettingsV6Palette.CardBg)
             .clickable(onClick = onClick)
             .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -295,8 +401,8 @@ private fun ThemeModeCard(
             )
         }
         Spacer(Modifier.height(8.dp))
-        Icon(icon, title, tint = if (selected) TeleportAppTheme.colors.accentBlue else TeleportAppTheme.colors.textMuted, modifier = Modifier.size(20.dp))
-        Text(title, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = TeleportAppTheme.colors.textPrimary)
+        Icon(icon, title, tint = if (selected) SettingsV6Palette.ToggleOnStart else SettingsV6Palette.TextMuted, modifier = Modifier.size(20.dp))
+        Text(title, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = SettingsV6Palette.TextPrimary)
     }
 }
 
@@ -307,20 +413,57 @@ fun EditProfileScreen(vm: TeleportViewModel, onBack: () -> Unit) {
     var bio by remember(user) { mutableStateOf(user?.bio ?: "") }
     var status by remember(user) { mutableStateOf(user?.status ?: "") }
 
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
-        TeleportTopBar("Редактировать", onBack)
-        TeleportTextField(name, { name = it }, "Имя")
-        Spacer(Modifier.height(12.dp))
-        TeleportTextField(bio, { bio = it }, "Описание")
-        Spacer(Modifier.height(12.dp))
-        TeleportTextField(status, { status = it }, "Статус")
-        Spacer(Modifier.height(24.dp))
-        TeleportButton("Сохранить", {
-            user?.let { vm.updateProfile(it.copy(displayName = name, bio = bio, status = status)) }
-            onBack()
-        })
+    SettingsV6Screen(title = "Редактировать", onBack = onBack) {
+        Column(Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                name, { name = it },
+                label = { Text("Имя", color = SettingsV6Palette.TextMuted) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = v6TextFieldColors(),
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                bio, { bio = it },
+                label = { Text("Описание", color = SettingsV6Palette.TextMuted) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = v6TextFieldColors(),
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                status, { status = it },
+                label = { Text("Статус", color = SettingsV6Palette.TextMuted) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = v6TextFieldColors(),
+            )
+            Spacer(Modifier.height(24.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(SettingsV6Palette.ToggleOnStart)
+                    .clickable {
+                        user?.let { vm.updateProfile(it.copy(displayName = name, bio = bio, status = status)) }
+                        onBack()
+                    }
+                    .padding(vertical = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Сохранить", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        }
     }
 }
+
+@Composable
+private fun v6TextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = SettingsV6Palette.TextPrimary,
+    unfocusedTextColor = SettingsV6Palette.TextPrimary,
+    focusedBorderColor = SettingsV6Palette.ToggleOnStart,
+    unfocusedBorderColor = SettingsV6Palette.CardBorder,
+    cursorColor = SettingsV6Palette.ToggleOnStart,
+    focusedContainerColor = SettingsV6Palette.CardBg,
+    unfocusedContainerColor = SettingsV6Palette.CardBg,
+)
 
 @Composable
 fun UsernameScreen(vm: TeleportViewModel, onBack: () -> Unit) {
@@ -328,22 +471,43 @@ fun UsernameScreen(vm: TeleportViewModel, onBack: () -> Unit) {
     var username by remember(user) { mutableStateOf(user?.username ?: "") }
     var available by remember { mutableStateOf<Boolean?>(null) }
 
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
-        TeleportTopBar("@username", onBack)
-        Text("Ваш профиль: teleport.app/@username", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(16.dp))
-        TeleportTextField(username, {
-            username = it.filter { c -> c.isLetterOrDigit() || c == '_' }.lowercase()
-            vm.checkUsername(username, user?.id ?: "") { available = it }
-        }, "Username")
-        available?.let {
-            Text(if (it) "✓ Доступен" else "✗ Занят", color = if (it) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+    SettingsV6Screen(title = "@username", onBack = onBack) {
+        Column(Modifier.fillMaxWidth()) {
+            Text("Ваш профиль: teleport.app/@username", color = SettingsV6Palette.TextMuted, fontSize = 14.sp)
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                username,
+                {
+                    username = it.filter { c -> c.isLetterOrDigit() || c == '_' }.lowercase()
+                    vm.checkUsername(username, user?.id ?: "") { available = it }
+                },
+                label = { Text("Username", color = SettingsV6Palette.TextMuted) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = v6TextFieldColors(),
+            )
+            available?.let {
+                Text(
+                    if (it) "✓ Доступен" else "✗ Занят",
+                    color = if (it) Color(0xFF2ED974) else Color(0xFFFF7A7A),
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            Spacer(Modifier.height(24.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (available == true) SettingsV6Palette.ToggleOnStart else SettingsV6Palette.CardBorder)
+                    .clickable(enabled = available == true) {
+                        user?.let { vm.updateProfile(it.copy(username = username)) }
+                        onBack()
+                    }
+                    .padding(vertical = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Сохранить", fontWeight = FontWeight.Bold, color = Color.White)
+            }
         }
-        Spacer(Modifier.height(24.dp))
-        TeleportButton("Сохранить", {
-            user?.let { vm.updateProfile(it.copy(username = username)) }
-            onBack()
-        }, enabled = available == true)
     }
 }
 
@@ -355,20 +519,21 @@ fun SecurityScreen(
 ) {
     val settings by vm.settings().collectAsState(initial = null)
     var pin by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf<String?>(null) }
     var biometric by remember(settings) { mutableStateOf(settings?.biometricEnabled ?: false) }
     var appLock by remember(settings) { mutableStateOf(settings?.appLockEnabled ?: false) }
     val colors = TeleportAppTheme.colors
 
-    Column(Modifier.fillMaxSize()) {
-        TeleportTopBar("Защита аккаунта", onBack)
+    Column(Modifier.fillMaxSize().background(SettingsV6Palette.Bg)) {
+        SettingsV6SubTopBar("Защита аккаунта", onBack)
         LazyColumn(
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
                 Text(
                     "Защита от взлома: блокировка телефона, контроль сессий и надёжный пароль.",
-                    color = colors.textMuted,
+                    color = SettingsV6Palette.TextMuted,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(bottom = 4.dp),
                 )
@@ -428,7 +593,15 @@ fun SecurityScreen(
             }
             item {
                 TeleportButton("Сохранить", {
-                    if (appLock && pin.isNotBlank() && pin.length < 4) return@TeleportButton
+                    if (appLock && pin.isNotBlank() && pin.length < 4) {
+                        pinError = "PIN должен содержать от 4 до 6 цифр"
+                        return@TeleportButton
+                    }
+                    if (appLock && pin.isBlank() && settings?.pinHash.isNullOrBlank()) {
+                        pinError = "Задайте PIN для блокировки приложения"
+                        return@TeleportButton
+                    }
+                    pinError = null
                     settings?.let {
                         vm.updateSettings(it.copy(
                             pinHash = when {
@@ -442,6 +615,11 @@ fun SecurityScreen(
                     }
                     onBack()
                 }, modifier = Modifier.fillMaxWidth())
+            }
+            pinError?.let { msg ->
+                item {
+                    Text(msg, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 4.dp))
+                }
             }
         }
     }
@@ -465,29 +643,38 @@ private fun SwitchRow(title: String, checked: Boolean, onChecked: (Boolean) -> U
 fun SessionsScreen(vm: TeleportViewModel, onBack: () -> Unit) {
     val sessions by vm.sessions().collectAsState(initial = emptyList())
 
-    Column(Modifier.fillMaxSize()) {
-        TeleportTopBar("Активные сессии", onBack)
+    SettingsV6Screen(title = "Активные сессии", onBack = onBack) {
         if (sessions.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Нет активных сессий", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            Text("Нет активных сессий", color = SettingsV6Palette.TextMuted, modifier = Modifier.padding(16.dp))
         } else {
-            LazyColumn {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(sessions) { session ->
-                    ListItem(
-                        headlineContent = { Text(session.deviceName) },
-                        supportingContent = {
-                            Text("${session.platform} • ${if (session.isCurrent) "Текущая" else "Активна"}")
-                        },
-                        leadingContent = { Icon(Icons.Default.PhoneAndroid, null) },
-                        trailingContent = {
-                            if (!session.isCurrent) {
-                                TextButton(onClick = { vm.terminateSession(session.id) }) {
-                                    Text("Завершить")
-                                }
-                            }
-                        },
-                    )
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(SettingsV6Palette.CardBg)
+                            .border(1.dp, SettingsV6Palette.CardBorder, RoundedCornerShape(16.dp))
+                            .padding(14.dp),
+                    ) {
+                        Text(session.deviceName, fontWeight = FontWeight.SemiBold, color = SettingsV6Palette.TextPrimary)
+                        Text(
+                            "${session.platform} • ${if (session.isCurrent) "Текущая" else "Активна"}",
+                            fontSize = 13.sp,
+                            color = SettingsV6Palette.TextMuted,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                        if (!session.isCurrent) {
+                            Text(
+                                "Завершить",
+                                color = Color(0xFFFF7A7A),
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .padding(top = 8.dp)
+                                    .clickable { vm.terminateSession(session.id) },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -501,16 +688,29 @@ fun NotificationsScreen(vm: TeleportViewModel, onBack: () -> Unit) {
     var silent by remember(settings) { mutableStateOf(settings?.silentMode ?: false) }
     var vibration by remember(settings) { mutableStateOf(settings?.vibrationEnabled ?: true) }
 
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
-        TeleportTopBar("Уведомления", onBack)
-        SwitchRow("Push-уведомления", enabled) { enabled = it }
-        SwitchRow("Беззвучный режим", silent) { silent = it }
-        SwitchRow("Вибрация", vibration) { vibration = it }
+    SettingsV6Screen(title = "Уведомления", onBack = onBack) {
+        SettingsV6GroupCard(
+            listOf(
+                SettingsV6Row(Icons.Outlined.Notifications, Color(0xFFFF9F5F), Color(0xFFE0692E), "Push-уведомления", toggle = enabled, onToggle = { enabled = it }),
+                SettingsV6Row(Icons.Outlined.VolumeOff, Color(0xFF8280B4), Color(0xFF5C5A88), "Беззвучный режим", toggle = silent, onToggle = { silent = it }),
+                SettingsV6Row(Icons.Outlined.Vibration, Color(0xFF5FD1FF), Color(0xFF2E9EE0), "Вибрация", toggle = vibration, onToggle = { vibration = it }),
+            ),
+        )
         Spacer(Modifier.height(24.dp))
-        TeleportButton("Сохранить", {
-            settings?.let { vm.updateSettings(it.copy(notificationsEnabled = enabled, silentMode = silent, vibrationEnabled = vibration)) }
-            onBack()
-        })
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(SettingsV6Palette.ToggleOnStart)
+                .clickable {
+                    settings?.let { vm.updateSettings(it.copy(notificationsEnabled = enabled, silentMode = silent, vibrationEnabled = vibration)) }
+                    onBack()
+                }
+                .padding(vertical = 14.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("Сохранить", fontWeight = FontWeight.Bold, color = Color.White)
+        }
     }
 }
 
@@ -547,31 +747,21 @@ fun SearchUsersScreen(vm: TeleportViewModel, onBack: () -> Unit, onOpenChat: (St
 
 @Composable
 fun HelpScreen(onBack: () -> Unit) {
-    val colors = TeleportAppTheme.colors
-    Column(Modifier.fillMaxSize()) {
-        TeleportTopBar("Справка", onBack)
-        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item {
-                Text("Teleport Messenger", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = colors.textPrimary)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Защищённый мессенджер: PIN, сессии, звонки и чаты.",
-                    color = colors.textMuted,
-                )
-            }
-            item {
-                SettingsGroupCard {
-                    listOf(
-                        "Настройки → Защита аккаунта → PIN и биометрия",
-                        "Настройки → Активные сессии → завершить чужие входы",
-                        "Long-press на чат → закрепить / архив / папка",
-                        "Вложения → спойлер, фото, видео, голос",
-                    ).forEachIndexed { i, tip ->
-                        Text(tip, Modifier.padding(16.dp), color = colors.textPrimary)
-                        if (i < 3) HorizontalDivider(color = colors.divider)
-                    }
-                }
-            }
+    SettingsV6Screen(title = "Справка", onBack = onBack) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Teleport Messenger", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = SettingsV6Palette.TextPrimary)
+            Text(
+                "Защищённый мессенджер: PIN, сессии, звонки и чаты.",
+                color = SettingsV6Palette.TextMuted,
+            )
+            SettingsV6GroupCard(
+                listOf(
+                    SettingsV6Row(Icons.Outlined.Lock, Color(0xFF7C6FFF), Color(0xFF4A3AD6), "PIN и биометрия", value = "Профиль → Защита"),
+                    SettingsV6Row(Icons.Outlined.Devices, Color(0xFF4FD9A8), Color(0xFF1FA878), "Активные сессии", value = "Профиль"),
+                    SettingsV6Row(Icons.Outlined.PushPin, Color(0xFF5FA8FF), Color(0xFF2E5FE0), "Закрепить чат", value = "Long-press"),
+                    SettingsV6Row(Icons.Outlined.AttachFile, Color(0xFFFF7CB8), Color(0xFFE03E85), "Вложения", value = "Фото, видео, голос"),
+                ),
+            )
         }
     }
 }

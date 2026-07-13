@@ -97,6 +97,24 @@ struct AppSettings: Codable {
     var localeOverrides: [String: String] = [:]
 }
 
+struct AdminCheckDto: Codable {
+    let isOwner: Bool
+    let ownerUsername: String?
+}
+
+struct AdminStatsDto: Codable {
+    let usersTotal: Int
+    let messagesTotal: Int
+    let messagesToday: Int
+    let chatsTotal: Int
+    let accountsTotal: Int
+    let onlineNow: Int
+    let wsConnections: Int
+    let lastMessageAt: Int64?
+    let publicUrl: String?
+    let ownerUsername: String?
+}
+
 enum MainTab: String, CaseIterable {
     case chats, contacts, profile, settings, calls
 

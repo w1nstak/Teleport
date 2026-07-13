@@ -21,6 +21,7 @@ fun AppLockGate(
 ) {
     var unlocked by remember { mutableStateOf(!enabled || pinHash.isNullOrBlank()) }
     var pin by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     LaunchedEffect(enabled) {
@@ -40,10 +41,19 @@ fun AppLockGate(
         ) {
             Text("Teleport заблокирован", style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(24.dp))
-            TeleportTextField(pin, { pin = it }, "PIN-код")
+            TeleportTextField(pin, { pin = it; pinError = false }, "PIN-код")
+            if (pinError) {
+                Spacer(Modifier.height(8.dp))
+                Text("Неверный PIN", color = MaterialTheme.colorScheme.error)
+            }
             Spacer(Modifier.height(16.dp))
             TeleportButton("Разблокировать", {
-                if (hashPin(pin) == pinHash) unlocked = true
+                if (hashPin(pin) == pinHash) {
+                    unlocked = true
+                    pinError = false
+                } else {
+                    pinError = true
+                }
             })
             if (biometricEnabled && context is FragmentActivity) {
                 TextButton(onClick = { BiometricHelper.authenticate(context, { unlocked = true }) {} }) {

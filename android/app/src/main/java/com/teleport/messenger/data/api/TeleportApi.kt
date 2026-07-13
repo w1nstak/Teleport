@@ -85,6 +85,12 @@ interface TeleportApi {
 
     @GET("users/username/{username}/available")
     suspend fun checkUsername(@Path("username") username: String, @Query("exclude") exclude: String? = null): UsernameCheckResponse
+
+    @GET("admin/check")
+    suspend fun adminCheck(@Header("Authorization") token: String): AdminCheckDto
+
+    @GET("admin/stats")
+    suspend fun adminStats(@Header("Authorization") token: String): AdminStatsDto
 }
 
 object ApiClient {

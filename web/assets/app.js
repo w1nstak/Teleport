@@ -121,6 +121,7 @@ function closeEditDialog() {
 const state = {
   token: localStorage.getItem(STORAGE_KEY),
   user: null,
+  isOwner: false,
   chats: [],
   currentChatId: null,
   currentPeer: null,
@@ -187,6 +188,73 @@ function setMe(user) {
   $("profile-name").textContent = user.displayName || "—";
   $("profile-username").textContent = user.username ? `@${user.username}` : "";
   $("profile-avatar").textContent = initials(user.displayName);
+}
+
+async function refreshOwnerStatus() {
+  const btn = $("web-btn-admin");
+  if (!state.token) {
+    state.isOwner = false;
+    if (btn) {
+      btn.classList.add("hidden");
+      btn.classList.remove("admin-row");
+    }
+    return;
+  }
+  try {
+    const data = await api("/admin/check");
+    state.isOwner = !!data?.isOwner;
+    if (btn) {
+      btn.classList.toggle("hidden", !state.isOwner);
+      btn.classList.toggle("admin-row", state.isOwner);
+    }
+  } catch {
+    state.isOwner = false;
+    if (btn) btn.classList.add("hidden");
+  }
+}
+
+function renderAdminStats(stats) {
+  const box = $("admin-stats");
+  if (!box) return;
+  const rows = [
+    ["Пользователей", stats.usersTotal],
+    ["Сообщений всего", stats.messagesTotal],
+    ["Сообщений сегодня", stats.messagesToday],
+    ["Чатов", stats.chatsTotal],
+    ["Аккаунтов", stats.accountsTotal],
+    ["Онлайн сейчас", stats.onlineNow],
+    ["WebSocket", stats.wsConnections],
+  ];
+  if (stats.lastMessageAt) {
+    rows.push(["Последнее сообщение", new Date(stats.lastMessageAt).toLocaleString("ru-RU")]);
+  }
+  if (stats.publicUrl) {
+    rows.push(["Сервер", stats.publicUrl]);
+  }
+  box.innerHTML = rows
+    .map(
+      ([label, value]) =>
+        `<div class="admin-stat"><div class="admin-stat-label">${escapeHtml(label)}</div><div class="admin-stat-value">${escapeHtml(String(value))}</div></div>`,
+    )
+    .join("");
+}
+
+async function loadAdminStats() {
+  const box = $("admin-stats");
+  if (!state.isOwner) return;
+  if (box) box.innerHTML = '<p class="panel-hint">Загрузка…</p>';
+  try {
+    const stats = await api("/admin/stats");
+    renderAdminStats(stats);
+  } catch (err) {
+    if (box) box.innerHTML = `<p class="panel-hint" style="color:var(--danger)">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function openAdminPanel() {
+  if (!state.isOwner) return;
+  $("admin-modal")?.classList.remove("hidden");
+  await loadAdminStats();
 }
 
 function showSidePanel(panel) {
@@ -331,6 +399,7 @@ async function afterLogin(token) {
   localStorage.setItem(STORAGE_KEY, token);
   const me = await api("/users/me");
   setMe(me);
+  await refreshOwnerStatus();
   applyLabels();
   show("main");
   showAuthError("");
@@ -508,6 +577,13 @@ $("web-btn-locale")?.addEventListener("click", () => {
   $("locale-modal").classList.remove("hidden");
 });
 
+$("web-btn-admin")?.addEventListener("click", () => openAdminPanel());
+$("admin-close")?.addEventListener("click", () => $("admin-modal")?.classList.add("hidden"));
+$("admin-refresh")?.addEventListener("click", () => loadAdminStats());
+$("admin-modal")?.addEventListener("click", (e) => {
+  if (e.target === $("admin-modal")) $("admin-modal").classList.add("hidden");
+});
+
 $("web-btn-logout2")?.addEventListener("click", () => $("btn-logout").click());
 
 document.querySelectorAll(".tab-item[data-panel]").forEach((btn) => {
@@ -542,4 +618,4 @@ $("btn-nav-search")?.addEventListener?.("click", () => $("search-users")?.focus(
 
 applyLabels();
 showSidePanel("chats");
-tryRestoreSession();
+tryRestoreSession().catch(() => show("auth"));

@@ -1,5 +1,6 @@
 package com.teleport.messenger.ui.screens.main
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,13 +12,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.teleport.messenger.data.entity.CallEntity
 import com.teleport.messenger.data.entity.ChatType
-import com.teleport.messenger.ui.components.*
+import com.teleport.messenger.ui.components.AppFloatingBottomNav
+import com.teleport.messenger.ui.components.MainTab
+import com.teleport.messenger.ui.components.TeleportTopBar
+import com.teleport.messenger.ui.screens.chat.ChatListV6Item
+import com.teleport.messenger.ui.screens.chat.ChatListV6Palette
 import com.teleport.messenger.ui.screens.settings.SettingsGroupCard
 import com.teleport.messenger.ui.screens.settings.SettingsScreenScaffold
 import com.teleport.messenger.ui.theme.TeleportAppTheme
@@ -28,9 +31,7 @@ fun ContactsScreen(
     vm: TeleportViewModel,
     onChats: () -> Unit,
     onContacts: () -> Unit,
-    onProfile: () -> Unit,
     onSettings: () -> Unit,
-    onCalls: () -> Unit,
     onOpenChat: (String) -> Unit,
     onSearch: () -> Unit,
 ) {
@@ -42,16 +43,16 @@ fun ContactsScreen(
 
     SettingsScreenScaffold(
         bottomBar = {
-            AppFloatingBottomNav(MainTab.Contacts, onChats, onContacts, onProfile, onSettings, onCalls)
+            AppFloatingBottomNav(MainTab.Contacts, onChats, onContacts, onSettings)
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding).background(ChatListV6Palette.Bg)) {
             Text(
                 "Контакты",
-                fontSize = 34.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                color = colors.textPrimary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
+                color = ChatListV6Palette.TextPrimary,
             )
             if (contacts.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -62,9 +63,9 @@ fun ContactsScreen(
                     }
                 }
             } else {
-                LazyColumn {
-                    items(contacts, key = { it.id }) { chat ->
-                        ChatListItem(chat, { onOpenChat(chat.id) })
+                LazyColumn(contentPadding = PaddingValues(horizontal = 10.dp)) {
+                    items(contacts.size, key = { contacts[it].id }) { index ->
+                        ChatListV6Item(contacts[index], index, { onOpenChat(contacts[index].id) })
                     }
                 }
             }
@@ -75,47 +76,31 @@ fun ContactsScreen(
 @Composable
 fun CallsListScreen(
     vm: TeleportViewModel,
-    onChats: () -> Unit,
-    onContacts: () -> Unit,
-    onProfile: () -> Unit,
-    onSettings: () -> Unit,
-    onCalls: () -> Unit,
+    onBack: () -> Unit,
     onOpenChat: (String) -> Unit,
 ) {
     val calls by vm.recentCalls.collectAsState()
     val chats by vm.chats.collectAsState()
     val colors = TeleportAppTheme.colors
 
-    SettingsScreenScaffold(
-        bottomBar = {
-            AppFloatingBottomNav(MainTab.Calls, onChats, onContacts, onProfile, onSettings, onCalls)
-        },
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            Text(
-                "Звонки",
-                fontSize = 34.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                color = colors.textPrimary,
-            )
-            if (calls.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Нет звонков", color = colors.textMuted)
-                }
-            } else {
-                LazyColumn {
-                    items(calls, key = { it.id }) { call ->
-                        val title = chats.find { it.id == call.chatId }?.title ?: "Чат"
-                        ListItem(
-                            headlineContent = { Text(title) },
-                            supportingContent = {
-                                Text(if (call.type == "video") "Видеозвонок" else "Звонок")
-                            },
-                            modifier = Modifier.clickable { onOpenChat(call.chatId) },
-                        )
-                        HorizontalDivider(color = colors.divider)
-                    }
+    Column(Modifier.fillMaxSize()) {
+        TeleportTopBar("Звонки", onBack)
+        if (calls.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Нет звонков", color = colors.textMuted)
+            }
+        } else {
+            LazyColumn {
+                items(calls, key = { it.id }) { call ->
+                    val title = chats.find { it.id == call.chatId }?.title ?: "Чат"
+                    ListItem(
+                        headlineContent = { Text(title) },
+                        supportingContent = {
+                            Text(if (call.type == "video") "Видеозвонок" else "Звонок")
+                        },
+                        modifier = Modifier.clickable { onOpenChat(call.chatId) },
+                    )
+                    HorizontalDivider(color = colors.divider)
                 }
             }
         }
@@ -177,6 +162,7 @@ fun StickersScreen(onBack: () -> Unit) {
     SimplePlaceholderScreen("Эмодзи и стикеры", onBack)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SimplePlaceholderScreen(title: String, onBack: () -> Unit) {
     val colors = TeleportAppTheme.colors

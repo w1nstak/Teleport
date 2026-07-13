@@ -11,6 +11,8 @@ import com.teleport.messenger.data.api.QrAuthRequest
 import com.teleport.messenger.data.api.SendMessageRequest
 import com.teleport.messenger.data.api.SmsSendRequest
 import com.teleport.messenger.data.api.SmsVerifyRequest
+import com.teleport.messenger.data.api.AdminStatsDto
+import com.teleport.messenger.data.api.ApiErrors
 import com.teleport.messenger.data.api.UpdateProfileRequest
 import com.teleport.messenger.data.api.UserDto
 import com.teleport.messenger.data.api.AuthResponse
@@ -58,11 +60,25 @@ class TeleportRepository(
         if (account == null) {
             chatDao.observeActive()
         } else {
-            combine(chatDao.observeActive(), blockedDao.observeByAccount(account.id)) { chats, blocked ->
+            combine(
+                chatDao.observeActive(),
+                blockedDao.observeByAccount(account.id),
+                userDao.observeByAccount(account.id),
+            ) { chats, blocked, user ->
                 val blockedIds = blocked.map { it.blockedUserId }.toSet()
+                val userId = user?.id
                 chats.filterNot { chatInvolvesBlocked(it, blockedIds) }
+                    .filter { isVisibleInChatList(it, userId) }
             }
         }
+    }
+
+    private fun isVisibleInChatList(chat: ChatEntity, userId: String?): Boolean {
+        if (chat.isArchived || chat.type == ChatType.SAVED) return false
+        if (userId == null) return true
+        if (chat.id == "welcome_$userId") return true
+        if (chat.id.startsWith("p_")) return true
+        return false
     }
     val archivedChats: Flow<List<ChatEntity>> = chatDao.observeArchived()
     val allGifts: Flow<List<GiftEntity>> = giftDao.observeAll()
@@ -82,6 +98,7 @@ class TeleportRepository(
     fun observeBlocked(accountId: String) = blockedDao.observeByAccount(accountId)
 
     suspend fun initializeIfNeeded() = withContext(Dispatchers.IO) {
+        refreshLocalChats()
         if (giftDao.search("").isNotEmpty()) return@withContext
         seedGifts()
         seedMarketplace()
@@ -226,10 +243,7 @@ class TeleportRepository(
                 val resp = try {
                     ApiClient.api.loginByUsername(UsernameLoginRequest(clean, password))
                 } catch (e: Exception) {
-                    throw IllegalStateException(
-                        "Не удалось подключиться к серверу. Запустите START_SERVER.bat на ПК",
-                        e,
-                    )
+                    throw IllegalStateException(ApiErrors.message(e), e)
                 }
                 val phone = resp.phone ?: throw IllegalStateException("Аккаунт не найден")
                 val displayName = resp.displayName ?: clean
@@ -245,9 +259,15 @@ class TeleportRepository(
         withContext(Dispatchers.IO) {
             runCatching {
                 val clean = username.removePrefix("@").trim()
-                val resp = ApiClient.api.registerWeb(
-                    com.teleport.messenger.data.api.WebRegisterRequest(displayName.trim(), clean, password),
-                )
+                if (clean.length < 3) throw IllegalArgumentException("Имя пользователя: минимум 3 символа")
+                if (password.length < 8) throw IllegalArgumentException("Пароль: минимум 8 символов")
+                val resp = try {
+                    ApiClient.api.registerWeb(
+                        com.teleport.messenger.data.api.WebRegisterRequest(displayName.trim(), clean, password),
+                    )
+                } catch (e: Exception) {
+                    throw IllegalStateException(ApiErrors.message(e), e)
+                }
                 val phone = resp.phone ?: "web:$clean"
                 applyServerAuth(resp, phone, displayName.trim(), createDemo = false, password = password)
                 userDao.getById(resp.userId)?.let { u ->
@@ -396,12 +416,28 @@ class TeleportRepository(
     }
 
     suspend fun switchAccount(accountId: String) = withContext(Dispatchers.IO) {
+        val account = accountDao.observeAll().first().find { it.id == accountId }
+            ?: throw IllegalArgumentException("Аккаунт не найден")
         accountDao.deactivateAll()
-        accountDao.activate(accountId, null)
+        accountDao.activate(accountId, account.authToken)
     }
 
-    private suspend fun createDefaultChats(userId: String, name: String) {
+    suspend fun refreshLocalChats() = withContext(Dispatchers.IO) {
+        val account = accountDao.observeActive().first() ?: return@withContext
+        val user = userDao.observeByAccount(account.id).first() ?: return@withContext
+        ensureSavedChat(user.id)
+        ensureWelcomeChat(user.id, user.displayName)
+        pruneUnknownChats(user.id)
+    }
+
+    suspend fun ensureSavedChatForUser(userId: String): String = withContext(Dispatchers.IO) {
+        ensureSavedChat(userId)
+        "saved_$userId"
+    }
+
+    private suspend fun ensureSavedChat(userId: String) {
         val savedId = "saved_$userId"
+        if (chatDao.getById(savedId) != null) return
         chatDao.upsert(
             ChatEntity(
                 savedId,
@@ -412,7 +448,9 @@ class TeleportRepository(
             ),
         )
         chatMemberDao.upsert(ChatMemberEntity(savedId, userId, "owner"))
+    }
 
+    private suspend fun ensureWelcomeChat(userId: String, name: String) {
         userDao.upsert(
             UserEntity(
                 id = TELEPORT_SYSTEM_USER_ID,
@@ -423,16 +461,16 @@ class TeleportRepository(
                 isPremium = true,
             ),
         )
-
         val welcomeChatId = "welcome_$userId"
+        if (chatDao.getById(welcomeChatId) != null) return
         val greeting = name.trim().ifBlank { "друг" }
         val welcomeText = buildString {
             append("Добро пожаловать в Teleport, $greeting!\n\n")
             append("Teleport — быстрый и защищённый мессенджер.\n\n")
             append("• Найдите друзей через поиск (@username)\n")
             append("• Настройте анонимность в «Конфиденциальность»\n")
-            append("• Нажмите + чтобы начать новый чат\n\n")
-            append("Приятного общения! ✨")
+            append("• Нажмите карандаш, чтобы начать новый чат\n\n")
+            append("Приятного общения!")
         }
         chatDao.upsert(
             ChatEntity(
@@ -459,6 +497,24 @@ class TeleportRepository(
         )
     }
 
+    private suspend fun pruneUnknownChats(userId: String) {
+        val keep = mutableSetOf("welcome_$userId", "saved_$userId")
+        chatDao.getAllActive().forEach { chat ->
+            if (chat.id.startsWith("p_")) keep.add(chat.id)
+        }
+        chatDao.getAllActive().forEach { chat ->
+            if (chat.id !in keep) {
+                chatDao.deleteById(chat.id)
+            }
+        }
+    }
+
+    private suspend fun createDefaultChats(userId: String, name: String) {
+        ensureSavedChat(userId)
+        ensureWelcomeChat(userId, name)
+        pruneUnknownChats(userId)
+    }
+
     fun observeAllAccounts() = accountDao.observeAll()
 
     suspend fun openOrCreatePrivateChat(currentUserId: String, otherUserId: String): String =
@@ -469,15 +525,20 @@ class TeleportRepository(
                 runCatching {
                     val resp = ApiClient.api.openChat("Bearer $token", OpenChatRequest(otherUserId))
                     resp.peer?.let { upsertUserDto(it) }
+                    val canonical = canonicalPrivateChatId(currentUserId, otherUserId)
+                    val title = resp.title.ifBlank {
+                        resp.peer?.displayName ?: userDao.getById(otherUserId)?.displayName ?: "Чат"
+                    }
                     chatDao.upsert(
                         ChatEntity(
-                            id = resp.chatId,
+                            id = canonical,
                             type = ChatType.PRIVATE,
-                            title = resp.title,
+                            title = title,
                         ),
                     )
-                    resp.members.forEach { chatMemberDao.upsert(ChatMemberEntity(resp.chatId, it)) }
-                    return@withContext resp.chatId
+                    chatMemberDao.upsert(ChatMemberEntity(canonical, currentUserId))
+                    chatMemberDao.upsert(ChatMemberEntity(canonical, otherUserId))
+                    return@withContext canonical
                 }
             }
             val canonical = canonicalPrivateChatId(currentUserId, otherUserId)
@@ -559,8 +620,10 @@ class TeleportRepository(
             ),
         )
         if (createDemo) {
-            createDefaultChats(resp.userId, displayName)
+            ensureSavedChat(resp.userId)
         }
+        ensureWelcomeChat(resp.userId, displayName)
+        pruneUnknownChats(resp.userId)
         syncChatsFromServer()
     }
 
@@ -602,6 +665,7 @@ class TeleportRepository(
         val account = accountDao.observeActive().first() ?: return@withContext
         val me = userDao.observeByAccount(account.id).first() ?: return@withContext
         runCatching { ApiClient.api.listChats("Bearer $token") }.getOrNull()?.forEach { item ->
+            if (chatDao.getById(item.chatId) == null) return@forEach
             chatDao.upsert(
                 ChatEntity(
                     id = item.chatId,
@@ -674,19 +738,24 @@ class TeleportRepository(
         val account = accountDao.observeActive().first() ?: return@withContext null
         val user = userDao.observeByAccount(account.id).first() ?: return@withContext null
         val phone = account.phone
-        if (phone.isBlank() || phone.startsWith("yandex:") || phone.startsWith("telegram:")) {
-            return@withContext account.authToken
+        val tokenOnly = phone.isBlank() ||
+            phone.startsWith("yandex:") ||
+            phone.startsWith("telegram:") ||
+            phone.startsWith("web:")
+        if (tokenOnly) {
+            val token = account.authToken?.takeIf { it.isNotBlank() } ?: return@withContext null
+            runCatching { ApiClient.api.syncMessages("Bearer $token", 0) }
+            return@withContext token
         }
-        val pwd = phone
         runCatching {
             val token = account.authToken?.takeIf { it.isNotBlank() }
             if (token != null) {
                 runCatching { ApiClient.api.syncMessages("Bearer $token", 0) }.onSuccess { return@withContext token }
             }
             val resp = runCatching {
-                ApiClient.api.login(AuthRequest(phone, pwd))
+                ApiClient.api.login(AuthRequest(phone, phone))
             }.getOrElse {
-                ApiClient.api.register(AuthRequest(phone, pwd, user.displayName))
+                ApiClient.api.register(AuthRequest(phone, phone, user.displayName))
             }
             if (user.id != resp.userId) migrateUserId(user.id, resp.userId)
             accountDao.deactivateAll()
@@ -905,7 +974,7 @@ class TeleportRepository(
 
     suspend fun buyStars(userId: String, amount: Long) = withContext(Dispatchers.IO) {
         userDao.adjustStars(userId, amount)
-        starDao.insert(StarTransactionEntity(UUID.randomUUID().toString(), userId, amount, "purchase", "Purchased $amount Stars"))
+        starDao.insert(StarTransactionEntity(UUID.randomUUID().toString(), userId, amount, "purchase", "Куплено $amount искр"))
     }
 
     suspend fun transferStars(fromUserId: String, toUserId: String, amount: Long): Boolean = withContext(Dispatchers.IO) {
@@ -913,8 +982,8 @@ class TeleportRepository(
         if (from.starsBalance < amount) return@withContext false
         userDao.adjustStars(fromUserId, -amount)
         userDao.adjustStars(toUserId, amount)
-        starDao.insert(StarTransactionEntity(UUID.randomUUID().toString(), fromUserId, -amount, "transfer_out", "Transfer to user"))
-        starDao.insert(StarTransactionEntity(UUID.randomUUID().toString(), toUserId, amount, "transfer_in", "Transfer from user"))
+        starDao.insert(StarTransactionEntity(UUID.randomUUID().toString(), fromUserId, -amount, "transfer_out", "Перевод искр"))
+        starDao.insert(StarTransactionEntity(UUID.randomUUID().toString(), toUserId, amount, "transfer_in", "Получено искр"))
         true
     }
 
@@ -1005,5 +1074,48 @@ class TeleportRepository(
         chatDao.getById(chatId)?.let { chat ->
             chatDao.upsert(chat.copy(lastMessagePreview = "", unreadCount = 0))
         }
+    }
+
+    suspend fun adminCheck(): Boolean = withContext(Dispatchers.IO) {
+        val account = accountDao.observeActive().first() ?: return@withContext false
+        val user = userDao.observeByAccount(account.id).first()
+        val localOwner = isOwnerUsername(user?.username)
+        val token = getAuthToken() ?: return@withContext localOwner
+        runCatching { ApiClient.api.adminCheck("Bearer $token").isOwner }.getOrDefault(localOwner) || localOwner
+    }
+
+    private fun isOwnerUsername(username: String?): Boolean =
+        username?.trim()?.removePrefix("@")?.lowercase() == "w1nst"
+
+    suspend fun adminStats(): Result<AdminStatsDto> = withContext(Dispatchers.IO) {
+        val account = accountDao.observeActive().first()
+        val user = account?.let { userDao.observeByAccount(it.id).first() }
+        val localOwner = isOwnerUsername(user?.username)
+        val token = getAuthToken()
+        if (token != null) {
+            runCatching { ApiClient.api.adminStats("Bearer $token") }
+                .onSuccess { return@withContext Result.success(it) }
+        }
+        if (localOwner) {
+            return@withContext Result.success(buildLocalAdminStats())
+        }
+        Result.failure(IllegalStateException("Нет авторизации"))
+    }
+
+    private suspend fun buildLocalAdminStats(): AdminStatsDto {
+        val accounts = accountDao.observeAll().first()
+        val chats = chatDao.getAllActive()
+        return AdminStatsDto(
+            usersTotal = accounts.size.coerceAtLeast(1),
+            accountsTotal = accounts.size,
+            chatsTotal = chats.size,
+            messagesTotal = chats.count { it.lastMessagePreview.isNotEmpty() },
+            messagesToday = 0,
+            onlineNow = 1,
+            wsConnections = 0,
+            lastMessageAt = chats.maxOfOrNull { it.lastMessageTime }?.takeIf { it > 0 },
+            publicUrl = "Локально (сервер недоступен)",
+            ownerUsername = "w1nst",
+        )
     }
 }

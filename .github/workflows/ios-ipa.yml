@@ -3,8 +3,10 @@ name: Build iOS IPA
 on:
   workflow_dispatch:
   push:
+    branches: [master, main]
     paths:
-      - 'teleport/ios/**'
+      - 'ios/**'
+      - '.github/workflows/ios-ipa.yml'
 
 jobs:
   build:
@@ -16,11 +18,11 @@ jobs:
         run: brew install xcodegen
 
       - name: Generate Xcode project
-        working-directory: teleport/ios
+        working-directory: ios
         run: xcodegen generate
 
-      - name: Build for Simulator (CI smoke test)
-        working-directory: teleport/ios
+      - name: Build for Simulator (smoke test)
+        working-directory: ios
         run: |
           xcodebuild \
             -project Teleport.xcodeproj \
@@ -30,9 +32,9 @@ jobs:
             build \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Archive (requires signing secrets)
+      - name: Build IPA (needs DEVELOPMENT_TEAM secret)
         if: ${{ secrets.DEVELOPMENT_TEAM != '' }}
-        working-directory: teleport/ios
+        working-directory: ios
         env:
           DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
@@ -44,4 +46,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Teleport-ipa
-          path: teleport/ios/build/ipa/*.ipa
+          path: |
+            ios/build/ipa/*.ipa
+            Teleport.ipa

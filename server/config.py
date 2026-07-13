@@ -32,3 +32,6 @@ HOST = os.environ.get("HOST", "0.0.0.0")
 
 # Public URL without trailing slash, e.g. https://api.example.com
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "").rstrip("/")
+
+# Владелец / админ (username без @, без учёта регистра)
+OWNER_USERNAME = os.environ.get("OWNER_USERNAME", "w1nst").strip().lstrip("@").lower()

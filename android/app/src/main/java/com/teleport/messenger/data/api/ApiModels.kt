@@ -119,4 +119,21 @@ data class SmsSendResponse(val ok: Boolean, val devCode: String? = null, val ret
 data class SmsVerifyResponse(val ok: Boolean)
 
 @Serializable
+data class AdminStatsDto(
+    val usersTotal: Int = 0,
+    val messagesTotal: Int = 0,
+    val messagesToday: Int = 0,
+    val chatsTotal: Int = 0,
+    val accountsTotal: Int = 0,
+    val onlineNow: Int = 0,
+    val wsConnections: Int = 0,
+    val lastMessageAt: Long? = null,
+    val publicUrl: String? = null,
+    val ownerUsername: String? = null,
+)
+
+@Serializable
+data class AdminCheckDto(val isOwner: Boolean, val ownerUsername: String? = null)
+
+@Serializable
 data class WsEnvelope(val event: String, val payload: kotlinx.serialization.json.JsonObject? = null)

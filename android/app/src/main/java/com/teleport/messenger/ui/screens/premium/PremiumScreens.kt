@@ -58,12 +58,11 @@ import com.teleport.messenger.ui.theme.TeleportAppTheme
 
 
 import com.teleport.messenger.ui.screens.settings.SettingsGroupCard
-
 import com.teleport.messenger.ui.screens.settings.SettingsSoftBackButton
+import com.teleport.messenger.ui.screens.settings.iskryLabel
+import com.teleport.messenger.ui.screens.settings.IskryPriceText
 
 import com.teleport.messenger.ui.theme.PremiumGold
-
-import com.teleport.messenger.ui.theme.StarYellow
 
 import com.teleport.messenger.viewmodel.TeleportViewModel
 
@@ -259,292 +258,45 @@ fun PremiumScreen(vm: TeleportViewModel, onBack: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StarsScreen(vm: TeleportViewModel, onBack: () -> Unit, onGift: () -> Unit) {
-
+fun IskryScreen(vm: TeleportViewModel, onBack: () -> Unit, onGift: () -> Unit) {
     val user by vm.currentUser().collectAsState(initial = null)
-
     val history by vm.starHistory(user?.id ?: "").collectAsState(initial = emptyList())
-
-    var tab by remember { mutableStateOf(StarsTab.All) }
-
-    var showBuySheet by remember { mutableStateOf(false) }
-
-
-
-    val filtered = remember(history, tab) {
-
-        when (tab) {
-
-            StarsTab.All -> history
-
-            StarsTab.Credits -> history.filter { it.amount > 0 }
-
-            StarsTab.Debits -> history.filter { it.amount < 0 }
-
-        }
-
+    val weekAgo = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }
+    val weekDelta = remember(history) {
+        history.filter { it.createdAt >= weekAgo && it.amount > 0 }.sumOf { it.amount }
     }
 
-
-
-    Scaffold(containerColor = TeleportAppTheme.colors.screenBg) { padding ->
-
-        Column(Modifier.fillMaxSize().padding(padding)) {
-
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp)) {
-
-                SettingsSoftBackButton(onBack)
-
-            }
-
-
-
-            LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
-
-                item {
-
-                    Column(
-
-                        Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-
-                        horizontalAlignment = Alignment.CenterHorizontally,
-
-                    ) {
-
-                        Text("⭐", fontSize = 72.sp)
-
-                        Text("Звёзды Teleport", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = TeleportAppTheme.colors.textPrimary)
-
-                        Text(
-
-                            "Цифровая валюта для подарков, Premium и покупок в приложении.",
-
-                            color = TeleportAppTheme.colors.textMuted,
-
-                            textAlign = TextAlign.Center,
-
-                            fontSize = 14.sp,
-
-                            modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
-
-                        )
-
-                    }
-
-                }
-
-
-
-                item {
-
-                    SettingsGroupCard {
-
-                        Column(
-
-                            Modifier.padding(24.dp),
-
-                            horizontalAlignment = Alignment.CenterHorizontally,
-
-                        ) {
-
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-
-                                Text(
-
-                                    "${user?.starsBalance ?: 0}",
-
-                                    fontSize = 48.sp,
-
-                                    fontWeight = FontWeight.Bold,
-
-                                    color = TeleportAppTheme.colors.textPrimary,
-
-                                )
-
-                                Spacer(Modifier.width(8.dp))
-
-                                Text("⭐", fontSize = 32.sp)
-
-                            }
-
-                            Spacer(Modifier.height(20.dp))
-
-                            Button(
-
-                                onClick = { showBuySheet = true },
-
-                                modifier = Modifier.fillMaxWidth().height(52.dp),
-
-                                shape = RoundedCornerShape(26.dp),
-
-                                colors = ButtonDefaults.buttonColors(containerColor = TeleportAppTheme.colors.accentBlue),
-
-                            ) {
-
-                                Icon(Icons.Default.Add, null)
-
-                                Spacer(Modifier.width(8.dp))
-
-                                Text("Купить звёзды", fontWeight = FontWeight.SemiBold)
-
-                            }
-
-                            TextButton(onClick = onGift, modifier = Modifier.padding(top = 8.dp)) {
-
-                                Icon(Icons.Default.People, null, tint = TeleportAppTheme.colors.accentBlue, modifier = Modifier.size(18.dp))
-
-                                Spacer(Modifier.width(6.dp))
-
-                                Text("Подарить звёзды друзьям", color = TeleportAppTheme.colors.accentBlue)
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-
-
-                item {
-
-                    Spacer(Modifier.height(16.dp))
-
-                    SettingsGroupCard {
-
-                        Row(
-
-                            Modifier
-
-                                .fillMaxWidth()
-
-                                .clickable { }
-
-                                .padding(16.dp),
-
-                            verticalAlignment = Alignment.CenterVertically,
-
-                        ) {
-
-                            Box(
-
-                                Modifier
-
-                                    .size(44.dp)
-
-                                    .clip(CircleShape)
-
-                                    .background(Color(0xFF34C759)),
-
-                                contentAlignment = Alignment.Center,
-
-                            ) {
-
-                                Icon(Icons.Default.TrendingUp, null, tint = Color.White)
-
-                            }
-
-                            Spacer(Modifier.width(14.dp))
-
-                            Column(Modifier.weight(1f)) {
-
-                                Text("Заработать звёзды", fontWeight = FontWeight.SemiBold)
-
-                                Text("Выполняйте задания и получайте награды", fontSize = 13.sp, color = TeleportAppTheme.colors.textMuted)
-
-                            }
-
-                            Icon(Icons.Default.ChevronRight, null, tint = TeleportAppTheme.colors.chevron)
-
-                        }
-
-                    }
-
-                }
-
-
-
-                item {
-
-                    Spacer(Modifier.height(20.dp))
-
-                    StarsTabRow(tab, { tab = it })
-
-                }
-
-
-
-                items(filtered) { tx ->
-
-                    StarTransactionRow(tx)
-
-                }
-
-
-
-                if (filtered.isEmpty()) {
-
-                    item {
-
-                        Text(
-
-                            "Нет операций",
-
-                            modifier = Modifier.fillMaxWidth().padding(32.dp),
-
-                            textAlign = TextAlign.Center,
-
-                            color = TeleportAppTheme.colors.textMuted,
-
-                        )
-
-                    }
-
-                }
-
-            }
-
-        }
-
+    fun buyPack(pack: IskryPack) {
+        val total = pack.sparks + (pack.bonus ?: 0)
+        vm.buyIskry(total.toLong())
     }
 
-
-
-    if (showBuySheet) {
-
-        ModalBottomSheet(onDismissRequest = { showBuySheet = false }) {
-
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-
-                Text("Купить звёзды", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
-                listOf(50L, 100L, 250L, 500L, 1000L).forEach { amount ->
-
-                    OutlinedButton(
-
-                        onClick = { vm.buyStars(amount); showBuySheet = false },
-
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-
-                        shape = RoundedCornerShape(16.dp),
-
-                    ) {
-
-                        Text("$amount ⭐", fontWeight = FontWeight.SemiBold)
-
-                    }
-
+    Scaffold(containerColor = IskryV6Palette.Bg) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(IskryV6Palette.Bg),
+        ) {
+            IskryStoreTopBar(onBack)
+            LazyColumn(Modifier.fillMaxSize()) {
+                item {
+                    IskryHeroCard(
+                        balance = user?.starsBalance ?: 0L,
+                        weekDelta = weekDelta,
+                        onBuy = { defaultIskryPacks.firstOrNull { it.featured }?.let(::buyPack) },
+                        onGift = onGift,
+                    )
                 }
-
-                Spacer(Modifier.height(16.dp))
-
+                item {
+                    IskryPackagesSection(
+                        packs = defaultIskryPacks,
+                        onSelect = ::buyPack,
+                    )
+                }
             }
-
         }
-
     }
-
 }
 
 
@@ -649,7 +401,7 @@ private fun StarTransactionRow(tx: StarTransactionEntity) {
 
         Text(
 
-            "${if (tx.amount > 0) "+" else ""}${tx.amount} ⭐",
+            "${if (tx.amount > 0) "+" else ""}${iskryLabel(kotlin.math.abs(tx.amount))}",
 
             fontWeight = FontWeight.SemiBold,
 
@@ -703,14 +455,14 @@ fun GiftsScreen(vm: TeleportViewModel, onBack: () -> Unit, onCollection: () -> U
             title = { Text("Отправить «${gift.name}»") },
             text = {
                 Column {
-                    Text("Выберите чат (${gift.priceStars} ⭐)", color = TeleportAppTheme.colors.textMuted)
+                    Text("Выберите чат (${iskryLabel(gift.priceStars)})", color = TeleportAppTheme.colors.textMuted)
                     chats.filter { it.type == ChatType.PRIVATE }.take(10).forEach { chat ->
                         TextButton(onClick = {
                             val me = user ?: return@TextButton
                             vm.getContactForChat(chat.id, me.id) { contact ->
                                 if (contact != null) {
                                     vm.sendGift(contact.id, gift.id, chat.id) { ok ->
-                                        sendResult = if (ok) "Подарок отправлен!" else "Недостаточно звёзд"
+                                        sendResult = if (ok) "Подарок отправлен!" else "Недостаточно искр"
                                         selectedGift = null
                                     }
                                 }
@@ -767,7 +519,7 @@ private fun GiftCard(gift: GiftEntity, onSend: () -> Unit = {}) {
 
             }
 
-            Text("${gift.priceStars} ⭐", fontWeight = FontWeight.Bold, color = StarYellow)
+            IskryPriceText(gift.priceStars)
 
         }
 
@@ -820,12 +572,21 @@ fun GiftCollectionScreen(vm: TeleportViewModel, onBack: () -> Unit) {
 fun MarketplaceScreen(vm: TeleportViewModel, onBack: () -> Unit) {
 
     val listings by vm.listings.collectAsState()
+    val gifts by vm.gifts.collectAsState()
 
     var query by remember { mutableStateOf("") }
-
     var category by remember { mutableStateOf("all") }
 
-
+    val filtered = remember(listings, gifts, query, category) {
+        listings.filter { listing ->
+            val gift = gifts.find { it.id == listing.giftId }
+            val matchesQuery = query.isBlank() ||
+                gift?.name?.contains(query, ignoreCase = true) == true ||
+                listing.giftId.contains(query, ignoreCase = true)
+            val matchesCat = category == "all" || gift?.rarity == category
+            matchesQuery && matchesCat
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
 
@@ -845,7 +606,7 @@ fun MarketplaceScreen(vm: TeleportViewModel, onBack: () -> Unit) {
 
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
 
-            items(listings) { listing ->
+            items(filtered) { listing ->
 
                 MarketplaceListingCard(listing, onBuy = { vm.buyListing(listing.id) {} })
 
@@ -871,7 +632,7 @@ private fun MarketplaceListingCard(listing: MarketplaceListingEntity, onBuy: () 
 
                 Text("Подарок #${listing.giftId.takeLast(4)}", style = MaterialTheme.typography.titleMedium)
 
-                Text("${listing.priceStars} ⭐", color = StarYellow, fontWeight = FontWeight.Bold)
+                IskryPriceText(listing.priceStars)
 
             }
 

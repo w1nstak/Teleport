@@ -1,37 +1,48 @@
-# Teleport iOS — сборка IPA
+# Teleport iOS — сборка IPA (v1.0.1)
 
-Приложение **само подключается к облаку** — на iPhone ничего настраивать не нужно.
+Приложение подключается к `https://teleport-w1nst.amvera.io/` — на iPhone ничего настраивать не нужно.
 
-## Перед сборкой
+В сборке: панель владельца для **@w1nst** (Настройки → «Панель владельца»).
 
-1. Задеплойте сервер → см. **[HOSTING.md](../HOSTING.md)**
-2. Укажите URL один раз:
-
-```powershell
-cd ..
-.\setup_public_url.ps1 https://api.ВАШ-ДОМЕН.ru
-```
-
-3. Соберите IPA на Mac:
+## Быстрая сборка на Mac
 
 ```bash
 cd ios
 brew install xcodegen
-xcodegen generate
+export DEVELOPMENT_TEAM=XXXXXXXXXX   # Team ID из developer.apple.com
 chmod +x build_ipa.sh
-DEVELOPMENT_TEAM=ВАШ_TEAM_ID ./build_ipa.sh
+./build_ipa.sh
 ```
 
-Файл: `build/ipa/Teleport.ipa`
+Готовые файлы:
 
-## Debug (симулятор / разработка)
+- `ios/build/ipa/Teleport.ipa`
+- `Teleport.ipa` (в корне проекта, рядом с `Teleport.apk`)
 
-Xcode Debug использует `http://127.0.0.1:8765/` — запустите `START_SERVER.bat` на ПК.
+## Установка на iPhone
+
+- **Xcode** → Window → Devices → перетащить IPA на устройство  
+- или **AltStore** / **Sideloadly** (нужен Apple ID)
+
+## GitHub Actions (без Mac)
+
+1. Репозиторий на GitHub
+2. Secret `DEVELOPMENT_TEAM` = ваш Team ID
+3. **Actions** → **Build iOS IPA** → **Run workflow**
+4. Скачать артефакт **Teleport-ipa**
+
+## Debug (симулятор)
+
+```bash
+xcodegen generate
+xcodebuild -project Teleport.xcodeproj -scheme Teleport \
+  -destination 'platform=iOS Simulator,name=iPhone 15' build
+```
+
+Debug использует `http://127.0.0.1:8765/` — запустите `START_SERVER.bat` на ПК.
 
 ## Требования
 
 - macOS + Xcode 15+
-- HTTPS на хостинге для Release (iPhone)
-- Apple ID для установки на свой телефон
-
-Подробный деплой: [HOSTING.md](../HOSTING.md)
+- Apple ID / Developer (для IPA на реальный iPhone)
+- HTTPS на сервере для Release

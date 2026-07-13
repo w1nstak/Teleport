@@ -25,7 +25,7 @@ except ImportError:
     pass
 
 # Load dotenv before config paths are read
-from config import UPLOAD_DIR, WEB_DIR, PORT, HOST, PUBLIC_URL  # noqa: E402
+from config import UPLOAD_DIR, WEB_DIR, PORT, HOST, PUBLIC_URL, OWNER_USERNAME  # noqa: E402
 
 from database import connect, init_db
 from sms_service import generate_code, normalize_phone, send_sms, sms_is_configured, sms_provider
@@ -323,6 +323,32 @@ def auth_user_id(authorization: Optional[str]) -> str:
     return user_id
 
 
+def user_record(user_id: str) -> Optional[dict]:
+    if user_id in users_db:
+        return users_db[user_id]
+    conn = connect()
+    row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    if not row:
+        return None
+    return user_to_dict(row)
+
+
+def is_owner_user(user_id: str) -> bool:
+    user = user_record(user_id)
+    if not user:
+        return False
+    username = (user.get("username") or "").strip().lstrip("@").lower()
+    return username == OWNER_USERNAME
+
+
+def require_owner(authorization: Optional[str]) -> str:
+    user_id = auth_user_id(authorization)
+    if not is_owner_user(user_id):
+        raise HTTPException(403, "Owner access only")
+    return user_id
+
+
 def row_to_msg(row) -> dict:
     return {
         "id": row["id"],
@@ -401,6 +427,43 @@ def health():
         "smsReady": sms_is_configured(),
         "wsClients": len(ws_clients),
         "publicUrl": PUBLIC_URL or None,
+    }
+
+
+@app.get("/admin/check")
+def admin_check(authorization: Optional[str] = Header(None)):
+    user_id = auth_user_id(authorization)
+    return {"isOwner": is_owner_user(user_id), "ownerUsername": OWNER_USERNAME}
+
+
+@app.get("/admin/stats")
+def admin_stats(authorization: Optional[str] = Header(None)):
+    require_owner(authorization)
+    conn = connect()
+    users_total = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
+    messages_total = conn.execute("SELECT COUNT(*) AS c FROM messages").fetchone()["c"]
+    chats_total = conn.execute("SELECT COUNT(*) AS c FROM chats").fetchone()["c"]
+    accounts_total = conn.execute("SELECT COUNT(*) AS c FROM accounts").fetchone()["c"]
+    online_db = conn.execute("SELECT COUNT(*) AS c FROM users WHERE is_online = 1").fetchone()["c"]
+    day_start = int(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp() * 1000)
+    messages_today = conn.execute(
+        "SELECT COUNT(*) AS c FROM messages WHERE created_at >= ?", (day_start,)
+    ).fetchone()["c"]
+    last_msg = conn.execute(
+        "SELECT created_at FROM messages ORDER BY created_at DESC LIMIT 1"
+    ).fetchone()
+    conn.close()
+    return {
+        "usersTotal": users_total,
+        "messagesTotal": messages_total,
+        "messagesToday": messages_today,
+        "chatsTotal": chats_total,
+        "accountsTotal": accounts_total,
+        "onlineNow": max(online_db, len(ws_clients)),
+        "wsConnections": len(ws_clients),
+        "lastMessageAt": last_msg["created_at"] if last_msg else None,
+        "publicUrl": PUBLIC_URL or None,
+        "ownerUsername": OWNER_USERNAME,
     }
 
 

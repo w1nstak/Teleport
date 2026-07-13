@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teleport — Чаты (веб)</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=JetBrains+Mono:wght@400;700&display=swap" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #050508;
+      font-family: Inter, system-ui, sans-serif;
+      padding: 24px;
+    }
+    .phone {
+      width: 390px;
+      max-width: 100%;
+      height: 844px;
+      max-height: 92vh;
+      background: #0A0A12;
+      border-radius: 28px;
+      border: 1px solid #1C1C2C;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 24px 80px rgba(0,0,0,.55);
+    }
+    .top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 18px 16px 12px;
+      flex-shrink: 0;
+    }
+    .search {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #16162380;
+      border: 1px solid #2A2A45;
+      border-radius: 14px;
+      padding: 10px 14px;
+      color: #6B69A0;
+      font-size: 14px;
+    }
+    .search svg { flex-shrink: 0; }
+    .compose {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(150deg,#3E8EFF,#2255E0);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      border: none;
+      cursor: pointer;
+    }
+    .filters {
+      display: flex; gap: 8px;
+      padding: 0 16px 14px;
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+    .chip {
+      font-size: 13px; font-weight: 700;
+      padding: 7px 16px; border-radius: 12px;
+      white-space: nowrap; cursor: pointer; border: none;
+      background: #16162380; border: 1px solid #2A2A45; color: #8280B4;
+    }
+    .chip.active {
+      background: linear-gradient(135deg,#3E8EFF,#2A5FE0);
+      color: #fff; border-color: transparent;
+    }
+    .list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 10px 8px;
+    }
+    .row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 6px; border-radius: 14px;
+      cursor: pointer;
+    }
+    .row:hover { background: #16162340; }
+    .avatar-wrap { position: relative; flex-shrink: 0; }
+    .avatar {
+      width: 48px; height: 48px; border-radius: 15px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 15px; color: #fff;
+    }
+    .online {
+      position: absolute; bottom: -2px; right: -2px;
+      width: 13px; height: 13px; border-radius: 5px;
+      background: #2ED974; border: 2px solid #0A0A12;
+    }
+    .meta { flex: 1; min-width: 0; }
+    .line1 {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+    }
+    .name {
+      font-size: 15px; font-weight: 700; color: #F0EFFF;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .time {
+      font-size: 11px; font-family: 'JetBrains Mono', monospace;
+      color: #5C5A88; flex-shrink: 0;
+    }
+    .time.unread { color: #5FA8FF; }
+    .line2 {
+      display: flex; justify-content: space-between; align-items: center; margin-top: 2px; gap: 8px;
+    }
+    .msg {
+      font-size: 13px; color: #8280B4;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .badge {
+      background: linear-gradient(135deg,#5FA8FF,#2E5FE0);
+      color: #fff; font-size: 11px; font-weight: 700;
+      min-width: 18px; height: 18px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 5px; flex-shrink: 0;
+    }
+    .nav {
+      display: flex; align-items: center; justify-content: space-around;
+      padding: 10px 8px 14px;
+      border-top: 1px solid #1C1C2C;
+      background: #0D0D16;
+      flex-shrink: 0;
+    }
+    .tab {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      color: #5C5A88; font-size: 11px; cursor: pointer;
+      min-width: 72px;
+    }
+    .tab.active { color: #5FA8FF; font-weight: 700; }
+    .tab svg { width: 22px; height: 22px; }
+    .caption {
+      text-align: center; color: #5C5A88; font-size: 12px; margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="phone" id="app">
+      <div class="top">
+        <div class="search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <span>Поиск</span>
+        </div>
+        <button class="compose" aria-label="Новый чат">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+      </div>
+      <div class="filters" id="filters"></div>
+      <div class="list" id="list"></div>
+      <div class="nav">
+        <div class="tab active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-1.9 5.4 8.5 8.5 0 0 1-6.6 3.1 8.4 8.4 0 0 1-5.4-1.9L3 21l1.9-4.1A8.4 8.4 0 0 1 3 11.5a8.5 8.5 0 0 1 3.1-6.6A8.4 8.4 0 0 1 11.5 3a8.5 8.5 0 0 1 6.6 3.1 8.4 8.4 0 0 1 1.9 5.4Z"/></svg>
+          <span>Чаты</span>
+        </div>
+        <div class="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Контакты</span>
+        </div>
+        <div class="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <span>Настройки</span>
+        </div>
+      </div>
+    </div>
+    <p class="caption">Teleport — веб-превью списка чатов (v6)</p>
+  </div>
+  <script>
+    const gradients = [
+      ['#5FA8FF','#2E5FE0'], ['#4F97FF','#3350D0'], ['#6FB3FF','#3E6EE8'],
+      ['#57A0FF','#2A55D6'], ['#7CBBFF','#4670E8'], ['#4A93FF','#2848C8']
+    ];
+    const chats = [
+      { name: 'Анна Соколова', msg: 'Ты видел новый макет?', time: '14:32', unread: 2, init: 'АС', online: true, group: false },
+      { name: 'Рабочий чат', msg: 'Игорь: созвон переносится на 15:00', time: '13:50', unread: 5, init: 'РЧ', online: false, group: true },
+      { name: 'Дмитрий Волков', msg: 'Спасибо, все получил', time: '12:10', unread: 0, init: 'ДВ', online: true, group: false },
+      { name: 'Мама', msg: 'Не забудь позвонить бабушке', time: '11:45', unread: 1, init: 'М', online: true, group: false },
+      { name: 'Курс по дизайну', msg: 'Началась новая лекция', time: '10:20', unread: 0, init: 'КД', online: false, group: true },
+      { name: 'Сергей Иванов', msg: 'Погнали в субботу на футбол?', time: 'вчера', unread: 0, init: 'СИ', online: false, group: false },
+      { name: 'Отдел продаж', msg: 'Лена: отчёт за неделю готов', time: 'вчера', unread: 3, init: 'ОП', online: false, group: true },
+      { name: 'Катя', msg: 'Ахахах точно', time: 'вчера', unread: 0, init: 'К', online: true, group: false },
+      { name: 'Поддержка', msg: 'Ваш тикет #4521 закрыт', time: 'пн', unread: 0, init: 'ПД', online: false, group: false },
+      { name: 'Максим Петров', msg: 'Скинь, пожалуйста, файл', time: 'пн', unread: 1, init: 'МП', online: false, group: false }
+    ];
+    let filter = 'all';
+    const filtersEl = document.getElementById('filters');
+    const listEl = document.getElementById('list');
+    const chips = [
+      ['all', 'Все'], ['unread', 'Непрочитанные'], ['groups', 'Группы']
+    ];
+    chips.forEach(([id, label]) => {
+      const b = document.createElement('button');
+      b.className = 'chip' + (id === filter ? ' active' : '');
+      b.textContent = label;
+      b.onclick = () => { filter = id; render(); };
+      filtersEl.appendChild(b);
+    });
+    function render() {
+      filtersEl.querySelectorAll('.chip').forEach((el, i) => {
+        el.classList.toggle('active', chips[i][0] === filter);
+      });
+      const data = chats.filter(c => {
+        if (filter === 'unread') return c.unread > 0;
+        if (filter === 'groups') return c.group;
+        return true;
+      });
+      listEl.innerHTML = data.map((c, i) => {
+        const g = gradients[i % gradients.length];
+        return `<div class="row">
+          <div class="avatar-wrap">
+            <div class="avatar" style="background:linear-gradient(150deg,${g[0]},${g[1]})">${c.init}</div>
+            ${c.online ? '<div class="online"></div>' : ''}
+          </div>
+          <div class="meta">
+            <div class="line1">
+              <span class="name">${c.name}</span>
+              <span class="time${c.unread ? ' unread' : ''}">${c.time}</span>
+            </div>
+            <div class="line2">
+              <span class="msg">${c.msg}</span>
+              ${c.unread ? `<span class="badge">${c.unread}</span>` : ''}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    render();
+  </script>
+</body>
+</html>

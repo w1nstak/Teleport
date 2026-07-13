@@ -104,6 +104,7 @@
         </div>
         <div id="panel-settings" class="side-panel hidden">
           <div class="settings-list">
+            <button type="button" class="settings-row hidden" id="web-btn-admin">Панель владельца</button>
             <button type="button" class="settings-row" id="web-btn-locale">Локализация</button>
             <button type="button" class="settings-row" id="web-btn-logout2">Выйти</button>
           </div>
@@ -167,6 +168,19 @@
           <svg class="ico"><use href="/assets/icons.svg#ico-select"/></svg>
           <span id="menu-select">Выбрать чаты</span>
         </button>
+      </div>
+    </div>
+
+    <div id="admin-modal" class="modal hidden">
+      <div class="modal-card admin-modal-card">
+        <header class="modal-header">
+          <button type="button" class="btn text danger" id="admin-close">Закрыть</button>
+          <h2>Панель владельца</h2>
+          <button type="button" class="btn text" id="admin-refresh">Обновить</button>
+        </header>
+        <div class="admin-stats" id="admin-stats">
+          <p class="panel-hint">Загрузка…</p>
+        </div>
       </div>
     </div>
 

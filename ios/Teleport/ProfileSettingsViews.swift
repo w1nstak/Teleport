@@ -119,6 +119,7 @@ struct SettingsTabView: View {
     @State private var showFolders = false
     @State private var showStickers = false
     @State private var showDevices = false
+    @State private var showAdmin = false
 
     var body: some View {
         ScrollView {
@@ -131,6 +132,14 @@ struct SettingsTabView: View {
                     settingsNavRow("star.fill", .blue, "Избранное") {
                         if let fav = vm.favoritesChat() {
                             // open favorites in chats tab — user switches manually
+                        }
+                    }
+                }
+
+                if vm.isOwner {
+                    SlimGroupCard {
+                        settingsNavRow("shield.lefthalf.filled", Color(red: 0.69, green: 0.32, blue: 0.87), "Панель владельца") {
+                            showAdmin = true
                         }
                     }
                 }
@@ -177,6 +186,7 @@ struct SettingsTabView: View {
         .navigationDestination(isPresented: $showFolders) { FoldersView() }
         .navigationDestination(isPresented: $showStickers) { StickersView() }
         .navigationDestination(isPresented: $showDevices) { DevicesView() }
+        .navigationDestination(isPresented: $showAdmin) { AdminPanelView() }
     }
 
     private var divider: some View {
@@ -335,5 +345,69 @@ struct DevicesView: View {
         .scrollContentBackground(.hidden)
         .background(SlimColors.screenBg)
         .navigationTitle("Устройства")
+    }
+}
+
+struct AdminPanelView: View {
+    @EnvironmentObject var vm: AppViewModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 8) {
+                    Image(systemName: "shield.lefthalf.filled")
+                        .foregroundStyle(Color(red: 0.69, green: 0.32, blue: 0.87))
+                    Text("@w1nst · владелец")
+                        .font(.headline)
+                        .foregroundStyle(SlimColors.textPrimary)
+                }
+                .padding(.horizontal, 4)
+
+                if vm.isLoading && vm.adminStats == nil {
+                    ProgressView().frame(maxWidth: .infinity)
+                }
+
+                if let s = vm.adminStats {
+                    adminStatCard("Пользователей", "\(s.usersTotal)")
+                    adminStatCard("Сообщений всего", "\(s.messagesTotal)")
+                    adminStatCard("Сообщений сегодня", "\(s.messagesToday)")
+                    adminStatCard("Чатов", "\(s.chatsTotal)")
+                    adminStatCard("Аккаунтов", "\(s.accountsTotal)")
+                    adminStatCard("Онлайн сейчас", "\(s.onlineNow)")
+                    adminStatCard("WebSocket", "\(s.wsConnections)")
+                    if let ts = s.lastMessageAt {
+                        adminStatCard("Последнее сообщение", Date(timeIntervalSince1970: TimeInterval(ts) / 1000).formatted(date: .abbreviated, time: .shortened))
+                    }
+                    if let url = s.publicUrl {
+                        adminStatCard("Сервер", url)
+                    }
+                }
+
+                Button("Обновить") {
+                    Task { await vm.loadAdminStats() }
+                }
+                .foregroundStyle(SlimColors.accentBlue)
+                .frame(maxWidth: .infinity)
+            }
+            .padding(16)
+        }
+        .background(SlimColors.screenBg)
+        .navigationTitle("Панель владельца")
+        .task { await vm.loadAdminStats() }
+    }
+
+    private func adminStatCard(_ title: String, _ value: String) -> some View {
+        SlimGroupCard {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(SlimColors.textSecondary)
+                Text(value)
+                    .font(.title2.bold())
+                    .foregroundStyle(SlimColors.textPrimary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+        }
     }
 }

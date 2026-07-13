@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teleport — веб-превью</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&family=Manrope:wght@500;700;800&display=swap" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: #050508; font-family: Inter, system-ui, sans-serif; padding: 24px;
+    }
+    .wrap { display: flex; flex-direction: column; align-items: center; }
+    .phone {
+      width: 390px; max-width: 100%; height: 844px; max-height: 92vh;
+      background: #0A0A12; border-radius: 28px; border: 1px solid #1C1C2C;
+      overflow: hidden; display: flex; flex-direction: column;
+      box-shadow: 0 24px 80px rgba(0,0,0,.55); position: relative;
+    }
+    .screen { flex: 1; display: none; flex-direction: column; overflow: hidden; min-height: 0; }
+    .screen.active { display: flex; }
+    .scroll { flex: 1; overflow-y: auto; }
+    .caption { text-align: center; color: #5C5A88; font-size: 12px; margin-top: 16px; }
+    .nav {
+      display: flex; align-items: center; justify-content: space-around;
+      padding: 10px 8px 14px; border-top: 1px solid #1C1C2C; background: #0D0D16; flex-shrink: 0;
+    }
+    .tab {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      color: #5C5A88; font-size: 11px; cursor: pointer; min-width: 72px; border: none; background: none;
+    }
+    .tab.active { color: #5FA8FF; font-weight: 700; }
+    .tab svg { width: 22px; height: 22px; }
+    /* Chats */
+    .top { display: flex; align-items: center; gap: 8px; padding: 18px 16px 12px; }
+    .search {
+      flex: 1; display: flex; align-items: center; gap: 8px;
+      background: #16162380; border: 1px solid #2A2A45; border-radius: 14px;
+      padding: 10px 14px; color: #6B69A0; font-size: 14px;
+    }
+    .compose {
+      width: 40px; height: 40px; border-radius: 12px; border: none; cursor: pointer;
+      background: linear-gradient(150deg,#3E8EFF,#2255E0);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .filters { display: flex; gap: 8px; padding: 0 16px 14px; overflow-x: auto; }
+    .chip {
+      font-size: 13px; font-weight: 700; padding: 7px 16px; border-radius: 12px;
+      white-space: nowrap; cursor: pointer; border: none;
+      background: #16162380; border: 1px solid #2A2A45; color: #8280B4;
+    }
+    .chip.active { background: linear-gradient(135deg,#3E8EFF,#2A5FE0); color: #fff; border-color: transparent; }
+    .chat-row {
+      display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+      border-radius: 14px; cursor: pointer;
+    }
+    .chat-row:hover { background: #16162340; }
+    .avatar {
+      width: 48px; height: 48px; border-radius: 15px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 15px; color: #fff;
+      background: linear-gradient(150deg,#5FA8FF,#2E5FE0);
+    }
+    .name { font-size: 15px; font-weight: 700; color: #F0EFFF; }
+    .msg { font-size: 13px; color: #8280B4; margin-top: 2px; }
+    .badge {
+      background: linear-gradient(135deg,#5FA8FF,#2E5FE0); color: #fff;
+      font-size: 11px; font-weight: 700; min-width: 18px; height: 18px;
+      border-radius: 9px; display: flex; align-items: center; justify-content: center;
+    }
+    /* Settings */
+    .st-title {
+      font-size: 23px; font-weight: 800; font-family: Manrope, sans-serif;
+      color: #F0EFFF; letter-spacing: -0.4px; padding: 20px 18px 4px;
+    }
+    .st-body { padding: 14px; }
+    .st-label {
+      font-size: 12px; font-weight: 700; font-family: Manrope, sans-serif;
+      color: #5C5A88; letter-spacing: 0.8px; padding: 0 10px 6px;
+    }
+    .st-card {
+      background: #13131F; border: 1px solid #22223A; border-radius: 16px;
+      padding: 0 10px; margin-bottom: 20px;
+    }
+    .st-row {
+      display: flex; align-items: center; gap: 12px; padding: 11px 8px; cursor: pointer;
+    }
+    .st-icon {
+      width: 34px; height: 34px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .st-row-title { flex: 1; font-size: 15px; font-weight: 600; font-family: Manrope, sans-serif; color: #F0EFFF; }
+    .st-divider { height: 1px; background: #1C1C2C; margin-left: 54px; }
+    .profile-card {
+      display: flex; align-items: center; gap: 12px; background: #13131F;
+      border: 1px solid #22223A; border-radius: 16px; padding: 12px 14px;
+      margin-bottom: 16px; cursor: pointer;
+    }
+    .balance-card {
+      display: flex; align-items: center; gap: 14px;
+      background: linear-gradient(135deg,#221936,#14141C);
+      border: 1px solid #2C2A45; border-radius: 16px; padding: 14px 16px;
+      margin-bottom: 20px; cursor: pointer;
+    }
+    .spark {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #E4FF9C, #C6FF3D 60%, #8FCC1C 100%);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 18px rgba(198,255,61,0.35);
+    }
+    .topup {
+      background: #C6FF3D; color: #0B0B10; font-size: 13px; font-weight: 700;
+      font-family: Manrope, sans-serif; padding: 8px 16px; border-radius: 12px; border: none; cursor: pointer;
+    }
+    .logout-card {
+      background: #13131F; border: 1px solid #2A1F2A; border-radius: 16px;
+      padding: 12px 8px; margin-bottom: 14px; cursor: pointer;
+    }
+    .logout-text { color: #FF7A7A; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="phone">
+      <!-- ЧАТЫ -->
+      <div class="screen active" id="screen-chats">
+        <div class="top">
+          <div class="search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <span>Поиск</span>
+          </div>
+          <button class="compose"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+        </div>
+        <div class="filters">
+          <button class="chip active">Все</button>
+          <button class="chip">Непрочитанные</button>
+          <button class="chip">Группы</button>
+        </div>
+        <div class="scroll">
+          <div class="chat-row" onclick="openChat()">
+            <div class="avatar">TP</div>
+            <div style="flex:1">
+              <div class="name">Teleport</div>
+              <div class="msg">Добро пожаловать в Teleport!</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+              <span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#5FA8FF">сейчас</span>
+              <span class="badge">1</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- КОНТАКТЫ -->
+      <div class="screen" id="screen-contacts">
+        <div class="st-title">Контакты</div>
+        <div class="scroll st-body">
+          <p style="color:#6B69A0;font-size:14px;padding:8px 10px">Найдите друзей по @username в поиске.</p>
+        </div>
+      </div>
+
+      <!-- НАСТРОЙКИ -->
+      <div class="screen" id="screen-settings">
+        <div class="st-title">Настройки</div>
+        <div class="scroll st-body">
+          <div class="profile-card">
+            <div class="avatar" style="width:44px;height:44px;border-radius:14px;font-size:16px">W1</div>
+            <div style="flex:1">
+              <div class="name" style="font-size:15px">Мой профиль</div>
+              <div style="font-size:12px;font-family:'JetBrains Mono',monospace;color:#6B69A0">@w1nst</div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4A4870" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+          </div>
+          <div class="st-label">АККАУНТ</div>
+          <div class="st-card">
+            <div class="st-row"><div class="st-icon" style="background:linear-gradient(150deg,#5FA8FF,#2E5FE0)">👤</div><div class="st-row-title">Профиль</div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4A4870" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+            <div class="st-divider"></div>
+            <div class="st-row"><div class="st-icon" style="background:linear-gradient(150deg,#7C6FFF,#4A3AD6)">🛡</div><div class="st-row-title">Конфиденциальность</div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4A4870" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+            <div class="st-divider"></div>
+            <div class="st-row"><div class="st-icon" style="background:linear-gradient(150deg,#FF9F5F,#E0692E)">🔔</div><div class="st-row-title">Уведомления</div><div style="width:42px;height:25px;border-radius:13px;background:linear-gradient(135deg,#5FA8FF,#2E5FE0);position:relative"><div style="position:absolute;top:2px;right:2px;width:19px;height:19px;border-radius:50%;background:#fff"></div></div></div>
+            <div class="st-divider"></div>
+            <div class="st-row"><div class="st-icon" style="background:linear-gradient(150deg,#4FD9A8,#1FA878)">💬</div><div class="st-row-title">Чаты</div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4A4870" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+            <div class="st-divider"></div>
+            <div class="st-row"><div class="st-icon" style="background:linear-gradient(150deg,#5FD1FF,#2E9EE0)">💾</div><div class="st-row-title">Хранилище</div><span style="font-size:13px;color:#6B69A0">2.4/5 ГБ</span></div>
+          </div>
+          <div class="st-label">АДМИНИСТРИРОВАНИЕ</div>
+          <div class="st-card" style="margin-bottom:20px">
+            <div class="st-row" onclick="showScreen('admin')"><div class="st-icon" style="background:linear-gradient(150deg,#FF6F9F,#D6316E)">▦</div><div class="st-row-title">Админ-панель</div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4A4870" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+          </div>
+          <div class="balance-card" onclick="showScreen('iskry')">
+            <div class="spark"><svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 2C12 8 16 12 22 12C16 12 12 16 12 22C12 16 8 12 2 12C8 12 12 8 12 2Z" fill="#0B0B10"/></svg></div>
+            <div style="flex:1">
+              <div style="font-size:12px;color:#6B69A0">Баланс</div>
+              <div style="font-size:17px;font-weight:800;font-family:Manrope,sans-serif;color:#F0EFFF">1 240 искр</div>
+            </div>
+            <button class="topup" onclick="event.stopPropagation();showScreen('iskry')">Пополнить</button>
+          </div>
+          <div class="st-label">ОФОРМЛЕНИЕ</div>
+          <div class="st-card">
+            <div class="st-row"><div class="st-icon" style="background:linear-gradient(150deg,#B18BFF,#7A52E0)">🌙</div><div class="st-row-title">Тема</div><span style="font-size:13px;color:#6B69A0">Тёмная</span></div>
+          </div>
+          <div class="logout-card"><div class="st-row"><div class="st-icon" style="background:linear-gradient(150deg,#FF6F6F,#D93A3A)">↪</div><div class="st-row-title logout-text">Выйти</div></div></div>
+          <div style="text-align:center;font-size:11px;font-family:'JetBrains Mono',monospace;color:#3F3D5E;padding-bottom:10px">Teleport v6.2.1</div>
+        </div>
+      </div>
+
+      <!-- АДМИН -->
+      <div class="screen" id="screen-admin">
+        <div style="display:flex;align-items:center;gap:10px;padding:16px 16px 4px">
+          <button onclick="showScreen('settings')" style="width:36px;height:36px;border-radius:11px;border:none;background:rgba(255,255,255,0.05);color:#EDEBFF;cursor:pointer">←</button>
+          <div style="font-size:17px;font-weight:700;color:#F5F4FF">Админ-панель</div>
+        </div>
+        <div class="scroll st-body">
+          <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#2A1A32,#13131F);border:1px solid #3D2A45;border-radius:16px;padding:14px 16px;margin-bottom:16px">
+            <div class="st-icon" style="background:linear-gradient(150deg,#FF6F9F,#D6316E);width:40px;height:40px;border-radius:12px">▦</div>
+            <div><div class="name" style="font-size:15px">@w1nst · владелец</div><div style="font-size:12px;color:#6B69A0;margin-top:2px">Статистика сервера</div></div>
+          </div>
+          <div class="st-label">СЕРВЕР</div>
+          <div class="st-card">
+            <div class="st-row"><div class="st-row-title">Пользователей</div><span style="font-family:'JetBrains Mono',monospace;color:#6B69A0">12</span></div>
+            <div class="st-divider"></div>
+            <div class="st-row"><div class="st-row-title">Сообщений сегодня</div><span style="font-family:'JetBrains Mono',monospace;color:#6B69A0">48</span></div>
+            <div class="st-divider"></div>
+            <div class="st-row"><div class="st-row-title">Онлайн</div><span style="font-family:'JetBrains Mono',monospace;color:#6B69A0">3</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen" id="screen-iskry">
+        <div style="display:flex;align-items:center;gap:10px;padding:16px 16px 4px">
+          <button onclick="showScreen('settings')" style="width:36px;height:36px;border-radius:11px;border:none;background:rgba(255,255,255,0.05);color:#EDEBFF;cursor:pointer">←</button>
+          <div style="font-size:17px;font-weight:700;color:#F5F4FF">Искры</div>
+        </div>
+        <div class="scroll" style="padding:14px 16px">
+          <div style="border-radius:26px;padding:34px 22px 26px;background:linear-gradient(180deg,#221936,#14141C,#0E0E14);border:1px solid #262635;text-align:center">
+            <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#8E8CB8;letter-spacing:.08em">ВАШ БАЛАНС</div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:14px">
+              <div class="spark" style="width:48px;height:48px"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 2C12 8 16 12 22 12C16 12 12 16 12 22C12 16 8 12 2 12C8 12 12 8 12 2Z" fill="#0B0B10"/></svg></div>
+              <span style="font-size:48px;font-weight:700;color:#FAFAFF">1 240</span>
+            </div>
+            <div style="display:inline-flex;margin-top:12px;font-size:11px;font-family:'JetBrains Mono',monospace;color:#8FCC1C;background:rgba(198,255,61,0.1);padding:4px 10px;border-radius:20px">↑ +180 за неделю</div>
+            <div style="display:flex;justify-content:center;gap:12px;margin-top:26px">
+              <button style="display:flex;align-items:center;gap:8px;background:#C6FF3D;color:#0B0B10;font-size:14px;font-weight:700;padding:13px 22px;border-radius:16px;border:none;cursor:pointer">+ Купить</button>
+              <button style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.06);border:1px solid #2C2C3A;color:#D6D4F5;font-size:14px;font-weight:700;padding:13px 22px;border-radius:16px;cursor:pointer">🎁 Подарить</button>
+            </div>
+          </div>
+          <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#54527A;letter-spacing:.08em;margin:24px 0 12px">ВЫБЕРИТЕ ПАКЕТ</div>
+          <div style="display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#251A3E,#1A1230);border:1px solid #7C5CFF;border-radius:18px;padding:16px 18px;margin-bottom:10px;position:relative">
+            <span style="position:absolute;top:10px;right:12px;font-size:10px;font-weight:700;color:#fff;background:#7C5CFF;padding:3px 9px;border-radius:8px">ХИТ</span>
+            <div class="spark" style="width:48px;height:48px;border-radius:14px;background:rgba(198,255,61,0.12)"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 2C12 8 16 12 22 12C16 12 12 16 12 22C12 16 8 12 2 12C8 12 12 8 12 2Z" fill="#C6FF3D"/></svg></div>
+            <div style="flex:1"><div style="font-size:20px;font-weight:700;color:#FAFAFF">550 искр</div><div style="font-size:12px;color:#B8ACF0">+50 искр в подарок</div></div>
+            <div style="font-size:16px;font-weight:700;color:#FAFAFF">449 ₽</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <div style="background:#15151D;border:1px solid #232330;border-radius:16px;padding:14px 6px;text-align:center"><div style="color:#C6FF3D">✦</div><div style="font-size:16px;font-weight:700;color:#F5F4FF;margin-top:8px">700</div><div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#7A78A8">579 ₽</div></div>
+            <div style="background:#15151D;border:1px solid #232330;border-radius:16px;padding:14px 6px;text-align:center"><div style="color:#C6FF3D">✦</div><div style="font-size:16px;font-weight:700;color:#F5F4FF;margin-top:8px">1200</div><div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#7A78A8">899 ₽</div></div>
+            <div style="background:#15151D;border:1px solid #232330;border-radius:16px;padding:14px 6px;text-align:center"><div style="color:#C6FF3D">✦</div><div style="font-size:16px;font-weight:700;color:#F5F4FF;margin-top:8px">1300</div><div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#7A78A8">999 ₽</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ЧАТ -->
+      <div class="screen" id="screen-chat">
+        <div style="display:flex;align-items:center;gap:12px;padding:16px;border-bottom:1px solid #1C1C2C">
+          <button onclick="showScreen('chats')" style="background:none;border:none;color:#5FA8FF;font-size:14px;cursor:pointer">← Назад</button>
+          <strong style="color:#F0EFFF">Teleport</strong>
+        </div>
+        <div class="scroll" style="padding:16px">
+          <div style="max-width:88%;background:#161623;border:1px solid #2A2A45;border-radius:16px 16px 16px 4px;padding:12px 14px;color:#F0EFFF;font-size:14px;line-height:1.45;white-space:pre-wrap">Добро пожаловать в Teleport!
+
+Teleport — быстрый и защищённый мессенджер.
+
+• Найдите друзей через поиск (@username)
+• Настройте анонимность в «Конфиденциальность»
+• Нажмите карандаш, чтобы начать новый чат
+
+Приятного общения!</div>
+        </div>
+      </div>
+
+      <nav class="nav" id="main-nav">
+        <button class="tab active" data-tab="chats" onclick="showScreen('chats')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-1.9 5.4 8.5 8.5 0 0 1-6.6 3.1 8.4 8.4 0 0 1-5.4-1.9L3 21l1.9-4.1A8.4 8.4 0 0 1 3 11.5a8.5 8.5 0 0 1 3.1-6.6A8.4 8.4 0 0 1 11.5 3a8.5 8.5 0 0 1 6.6 3.1 8.4 8.4 0 0 1 1.9 5.4Z"/></svg>
+          <span>Чаты</span>
+        </button>
+        <button class="tab" data-tab="contacts" onclick="showScreen('contacts')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Контакты</span>
+        </button>
+        <button class="tab" data-tab="settings" onclick="showScreen('settings')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <span>Настройки</span>
+        </button>
+      </nav>
+    </div>
+    <p class="caption">Teleport — веб-превью (Чаты · Настройки · Искры)</p>
+  </div>
+  <script>
+    const mainTabs = ['chats', 'contacts', 'settings'];
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-' + id).classList.add('active');
+      const nav = document.getElementById('main-nav');
+      nav.style.display = (id === 'iskry' || id === 'chat' || id === 'admin') ? 'none' : 'flex';
+      document.querySelectorAll('.tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === id);
+      });
+    }
+    function openChat() { showScreen('chat'); }
+  </script>
+</body>
+</html>
