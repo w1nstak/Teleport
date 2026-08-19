@@ -1,205 +1,303 @@
 package com.teleport.messenger.ui.screens.auth
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import android.content.Context
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.teleport.messenger.ui.theme.ManropeFontFamily
 import com.teleport.messenger.viewmodel.TeleportViewModel
+
+private const val PrefsName = "teleport_auth_ui"
+private const val KeyRemember = "remember_me"
+private const val KeyPhone = "remembered_phone"
 
 @Composable
 fun TeleportAuthScreen(vm: TeleportViewModel, onSuccess: () -> Unit) {
-    var tab by remember { mutableStateOf(AuthTab.Register) }
-    var nameValue by remember { mutableStateOf(TextFieldValue("")) }
-    var usernameValue by remember { mutableStateOf(TextFieldValue("")) }
-    var passwordValue by remember { mutableStateOf(TextFieldValue("")) }
+    var tab by remember { mutableStateOf(AuthTab.Login) }
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
-    var usernameLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    var fieldWidthPx by remember { mutableFloatStateOf(0f) }
-    var usernameFocused by remember { mutableStateOf(false) }
-    var passwordFocused by remember { mutableStateOf(false) }
+    var agreed by remember { mutableStateOf(true) }
+    var rememberMe by remember { mutableStateOf(false) }
+    var showRecover by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val error by vm.error.collectAsState()
     val loading by vm.loading.collectAsState()
 
-    val username = usernameValue.text
-    val password = passwordValue.text
-    val name = nameValue.text
-    val loginValid = username.removePrefix("@").trim().length >= 3 && password.length >= 8
-    val registerValid = name.isNotBlank() && username.removePrefix("@").length >= 3 && password.length >= 8
-    val valid = if (tab == AuthTab.Login) loginValid else registerValid
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences(PrefsName, Context.MODE_PRIVATE)
+        rememberMe = prefs.getBoolean(KeyRemember, false)
+        if (rememberMe) phone = prefs.getString(KeyPhone, "") ?: ""
+    }
 
     LaunchedEffect(tab) { vm.clearError() }
 
-    AuthScreenShell {
-        AuthWelcomeHeader()
-        AuthTabSwitcher(tab) { tab = it }
+    val normalizedPhone = normalizePhone(phone)
+    val looksLikeUsername = phone.trim().startsWith("@") ||
+        (phone.any { it.isLetter() } && !phone.trim().startsWith("+"))
+    val loginValid = if (looksLikeUsername) {
+        phone.removePrefix("@").trim().length >= 3 && password.length >= 8
+    } else {
+        normalizedPhone.length >= 12 && password.length >= 8
+    }
+    val registerValid = name.isNotBlank() && normalizedPhone.length >= 12 && password.length >= 8 && agreed
 
+    val heroTitle = if (tab == AuthTab.Login) "С возвращением" else "Создай аккаунт"
+    val heroSubtitle = if (tab == AuthTab.Login) {
+        "Войдите, чтобы продолжить общение с друзьями"
+    } else {
+        "Общайся с друзьями и близкими в одном месте"
+    }
+
+    AuthScreenShell(heroTitle = heroTitle, heroSubtitle = heroSubtitle) {
         if (tab == AuthTab.Register) {
-            AuthTextField(
-                value = nameValue,
-                onValueChange = { nameValue = it },
-                placeholder = "Имя",
-                leadingIcon = Icons.Outlined.Person,
+            AuthLabeledField(
+                label = "Имя",
+                value = name,
+                onValueChange = { name = it },
+                placeholder = "Как вас зовут",
+                leadingIcon = { AuthFieldIcon(Icons.Outlined.Person) },
             )
-            Spacer(Modifier.height(10.dp))
         }
 
-        Box(Modifier.fillMaxWidth()) {
-            DolphinFieldPeek(
-                text = username,
-                cursorOffset = usernameValue.selection.start,
-                textLayoutResult = usernameLayout,
-                fieldWidthPx = fieldWidthPx,
-                hideForPassword = passwordFocused,
-                visible = usernameFocused || username.isNotEmpty(),
-                modifier = Modifier.align(Alignment.TopStart),
-            )
-            AuthTextField(
-                value = usernameValue,
-                onValueChange = { v ->
-                    val filtered = v.text.filter { c -> c.isLetterOrDigit() || c == '_' || c == '@' }
-                    val sel = v.selection.start.coerceIn(0, filtered.length)
-                    usernameValue = TextFieldValue(filtered, TextRange(sel))
+        AuthLabeledField(
+                    label = "Номер телефона",
+                    value = phone,
+                    onValueChange = { phone = it },
+                    placeholder = if (tab == AuthTab.Login) "+7 … или @username" else "+7 900 000 00 00",
+                    leadingIcon = { AuthFieldIcon(Icons.Outlined.Phone) },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = if (tab == AuthTab.Login) KeyboardType.Text else KeyboardType.Phone,
+                    ),
+                )
+
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            AuthLabeledField(
+                label = "Пароль",
+                value = password,
+                onValueChange = { password = it },
+                placeholder = if (tab == AuthTab.Login) "Введите пароль" else "Минимум 8 символов",
+                leadingIcon = { AuthFieldIcon(Icons.Outlined.Lock) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                trailing = {
+                    IconButton(onClick = { showPassword = !showPassword }, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                            contentDescription = null,
+                            tint = AuthPalette.TextDim,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                 },
-                placeholder = "Имя пользователя",
-                leadingIcon = Icons.Outlined.AlternateEmail,
-                onTextLayout = { usernameLayout = it },
-                onWidthChanged = { fieldWidthPx = it },
-                onFocusChanged = { usernameFocused = it },
-                contentPaddingEnd = 52.dp,
             )
+            if (tab == AuthTab.Register) {
+                AuthPasswordStrength(password)
+            }
         }
 
-        Spacer(Modifier.height(10.dp))
-
-        AuthTextField(
-            value = passwordValue,
-            onValueChange = { passwordValue = it },
-            placeholder = "Пароль",
-            leadingIcon = Icons.Outlined.Lock,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-            onFocusChanged = { passwordFocused = it },
-            trailing = {
-                IconButton(onClick = { showPassword = !showPassword }, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                        contentDescription = null,
-                        tint = AuthPalette.IconTint,
-                        modifier = Modifier.size(20.dp),
+        if (tab == AuthTab.Login) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Box(Modifier.weight(1f)) {
+                    AuthCheckbox(
+                        checked = rememberMe,
+                        onCheckedChange = { rememberMe = it },
+                        label = {
+                            Text(
+                                "Запомнить меня",
+                                fontFamily = ManropeFontFamily,
+                                fontSize = 12.5.sp,
+                                color = AuthPalette.TextDim,
+                            )
+                        },
                     )
                 }
-            },
-        )
+                Text(
+                    "Забыли пароль?",
+                    fontFamily = ManropeFontFamily,
+                    fontSize = 12.5.sp,
+                    color = AuthPalette.Link,
+                    modifier = Modifier.clickable { showRecover = true },
+                )
+            }
+        } else {
+            AuthCheckbox(
+                checked = agreed,
+                onCheckedChange = { agreed = it },
+                label = {
+                    Text(
+                        "Я согласен с условиями использования и политикой конфиденциальности",
+                        fontFamily = ManropeFontFamily,
+                        fontSize = 11.5.sp,
+                        color = AuthPalette.TextDim,
+                        lineHeight = 17.sp,
+                        modifier = Modifier.weight(1f),
+                    )
+                },
+            )
+        }
 
         error?.let {
             Text(
                 it,
-                color = MaterialTheme.colorScheme.error,
+                color = androidx.compose.ui.graphics.Color(0xFFFF7A7A),
+                fontFamily = ManropeFontFamily,
                 fontSize = 13.sp,
-                modifier = Modifier.padding(top = 10.dp).fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
             )
         }
 
-        Spacer(Modifier.height(22.dp))
-
         AuthPrimaryButton(
-            text = if (tab == AuthTab.Login) "Войти" else "Создать аккаунт",
-            enabled = valid,
+            text = if (tab == AuthTab.Login) "Войти" else "Зарегистрироваться",
+            enabled = if (tab == AuthTab.Login) loginValid else registerValid,
             loading = loading,
         ) {
+            context.getSharedPreferences(PrefsName, Context.MODE_PRIVATE).edit()
+                .putBoolean(KeyRemember, rememberMe)
+                .putString(KeyPhone, if (rememberMe) phone else "")
+                .apply()
+
             if (tab == AuthTab.Login) {
-                vm.loginByUsername(username, password, onSuccess)
+                if (looksLikeUsername) {
+                    vm.loginByUsername(phone.trim(), password, onSuccess)
+                } else {
+                    vm.login(normalizedPhone, password, onSuccess)
+                }
             } else {
-                vm.registerByUsername(name, username, password, onSuccess)
+                vm.register(normalizedPhone, password, name.trim(), onSuccess)
             }
         }
 
-        AuthSwitchModeLink(tab == AuthTab.Login) {
-            tab = if (tab == AuthTab.Login) AuthTab.Register else AuthTab.Login
+        if (tab == AuthTab.Login) {
+            val launchYandex = com.teleport.messenger.auth.rememberYandexAuthLauncher(
+                onSuccess = { token -> vm.loginWithYandexToken(token, onSuccess) },
+                onError = { msg -> vm.setError(msg) },
+            )
+            AuthFooterLink(
+                prefix = "Или ",
+                action = "войти через Яндекс ID",
+            ) {
+                launchYandex()
+            }
         }
-        AuthPrivacyFooter()
+
+        AuthFooterLink(
+            prefix = if (tab == AuthTab.Login) "Нет аккаунта? " else "Уже есть аккаунт? ",
+            action = if (tab == AuthTab.Login) "Зарегистрироваться" else "Войти",
+        ) {
+            tab = if (tab == AuthTab.Login) AuthTab.Register else AuthTab.Login
+            password = ""
+        }
+    }
+
+    if (showRecover) {
+        RecoverPasswordDialog(
+            initialPhone = phone,
+            onDismiss = { showRecover = false },
+            onSubmit = { p, newPass ->
+                vm.recover(normalizePhone(p), newPass) {
+                    showRecover = false
+                    phone = p
+                    password = newPass
+                    tab = AuthTab.Login
+                }
+            },
+        )
     }
 }
 
 @Composable
-private fun AuthTextField(
-    value: TextFieldValue,
-    onValueChange: (TextFieldValue) -> Unit,
-    placeholder: String,
-    leadingIcon: ImageVector? = null,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    visualTransformation: VisualTransformation = VisualTransformation.None,
-    onTextLayout: (TextLayoutResult) -> Unit = {},
-    onWidthChanged: (Float) -> Unit = {},
-    onFocusChanged: (Boolean) -> Unit = {},
-    contentPaddingEnd: androidx.compose.ui.unit.Dp = 0.dp,
-    trailing: @Composable (() -> Unit)? = null,
+private fun RecoverPasswordDialog(
+    initialPhone: String,
+    onDismiss: () -> Unit,
+    onSubmit: (phone: String, newPassword: String) -> Unit,
 ) {
-    val shape = RoundedCornerShape(14.dp)
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = Modifier
-            .fillMaxWidth()
-            .onSizeChanged { onWidthChanged(it.width.toFloat()) }
-            .height(54.dp)
-            .clip(shape)
-            .background(AuthPalette.InputBg)
-            .border(1.dp, AuthPalette.InputBorder, shape)
-            .padding(start = 14.dp, end = if (contentPaddingEnd > 0.dp) contentPaddingEnd else 14.dp)
-            .onFocusChanged { onFocusChanged(it.isFocused) },
-        textStyle = LocalTextStyle.current.copy(
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Normal,
-            color = AuthPalette.TextPrimary,
-        ),
-        singleLine = true,
-        keyboardOptions = keyboardOptions,
-        visualTransformation = visualTransformation,
-        onTextLayout = onTextLayout,
-        cursorBrush = SolidColor(AuthPalette.AccentCyan),
-        decorationBox = { inner ->
-            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                if (leadingIcon != null) {
-                    Icon(leadingIcon, null, tint = AuthPalette.IconTint, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(10.dp))
-                }
-                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (value.text.isEmpty()) {
-                        Text(placeholder, color = AuthPalette.TextMuted.copy(0.65f), fontSize = 16.sp)
-                    }
-                    inner()
-                }
-                trailing?.invoke()
+    var p by remember { mutableStateOf(initialPhone) }
+    var np by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = AuthPalette.Card,
+        titleContentColor = AuthPalette.Text,
+        textContentColor = AuthPalette.TextDim,
+        title = {
+            Text("Новый пароль", fontFamily = ManropeFontFamily, fontWeight = FontWeight.SemiBold)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                AuthLabeledField(
+                    label = "Номер телефона",
+                    value = p,
+                    onValueChange = { p = it },
+                    placeholder = "+7 900 000 00 00",
+                    leadingIcon = { AuthFieldIcon(Icons.Outlined.Phone) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                )
+                AuthLabeledField(
+                    label = "Новый пароль",
+                    value = np,
+                    onValueChange = { np = it },
+                    placeholder = "Минимум 8 символов",
+                    leadingIcon = { AuthFieldIcon(Icons.Outlined.Lock) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    visualTransformation = PasswordVisualTransformation(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (normalizePhone(p).length >= 12 && np.length >= 8) onSubmit(p, np)
+                },
+            ) {
+                Text("Сохранить", color = AuthPalette.Link, fontFamily = ManropeFontFamily)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена", color = AuthPalette.TextDim, fontFamily = ManropeFontFamily)
             }
         },
     )
+}
+
+/** Digits → +7XXXXXXXXXX for RU numbers. */
+private fun normalizePhone(raw: String): String {
+    val digits = raw.filter { it.isDigit() }
+    if (digits.isEmpty()) return ""
+    return when {
+        digits.startsWith("8") && digits.length == 11 -> "+7${digits.drop(1)}"
+        digits.startsWith("7") && digits.length == 11 -> "+$digits"
+        digits.length == 10 -> "+7$digits"
+        else -> if (raw.trim().startsWith("+")) "+$digits" else digits
+    }
 }
 
 @Composable

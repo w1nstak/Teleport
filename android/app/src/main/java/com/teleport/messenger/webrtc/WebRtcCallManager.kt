@@ -16,6 +16,7 @@ class WebRtcCallManager(private val context: Context) {
     private var peerConnection: PeerConnection? = null
     private var localAudioTrack: AudioTrack? = null
     private var localVideoTrack: VideoTrack? = null
+    private var remoteVideoTrack: VideoTrack? = null
     private var videoCapturer: CameraVideoCapturer? = null
     private var eglBase: EglBase? = null
     private var signalSender: ((JsonObject) -> Unit)? = null
@@ -24,6 +25,12 @@ class WebRtcCallManager(private val context: Context) {
 
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected
+
+    private val _localVideo = MutableStateFlow<VideoTrack?>(null)
+    val localVideo: StateFlow<VideoTrack?> = _localVideo
+
+    private val _remoteVideo = MutableStateFlow<VideoTrack?>(null)
+    val remoteVideo: StateFlow<VideoTrack?> = _remoteVideo
 
     private var muted = false
     private var videoEnabled = true
@@ -36,6 +43,8 @@ class WebRtcCallManager(private val context: Context) {
     fun setSignalSender(sender: (JsonObject) -> Unit) {
         signalSender = sender
     }
+
+    fun eglContext(): EglBase.Context? = eglBase?.eglBaseContext
 
     fun initialize() {
         if (factory != null) return
@@ -72,9 +81,11 @@ class WebRtcCallManager(private val context: Context) {
                     put("candidate", candidate.sdp)
                 })
             }
+
             override fun onConnectionChange(state: PeerConnection.PeerConnectionState) {
                 _connected.value = state == PeerConnection.PeerConnectionState.CONNECTED
             }
+
             override fun onSignalingChange(p0: PeerConnection.SignalingState?) = Unit
             override fun onIceConnectionChange(p0: PeerConnection.IceConnectionState?) = Unit
             override fun onIceConnectionReceivingChange(p0: Boolean) = Unit
@@ -84,7 +95,12 @@ class WebRtcCallManager(private val context: Context) {
             override fun onRemoveStream(p0: MediaStream?) = Unit
             override fun onDataChannel(p0: DataChannel?) = Unit
             override fun onRenegotiationNeeded() = Unit
-            override fun onAddTrack(p0: RtpReceiver?, p1: Array<out MediaStream>?) = Unit
+
+            override fun onAddTrack(receiver: RtpReceiver?, streams: Array<out MediaStream>?) {
+                val track = receiver?.track() as? VideoTrack ?: return
+                remoteVideoTrack = track
+                _remoteVideo.value = track
+            }
         })
         peerConnection?.addTrack(localAudioTrack)
         if (localVideoTrack != null) peerConnection?.addTrack(localVideoTrack)
@@ -105,6 +121,7 @@ class WebRtcCallManager(private val context: Context) {
         localVideoTrack = f.createVideoTrack("video0", videoSource)
         localVideoTrack?.setEnabled(true)
         videoEnabled = true
+        _localVideo.value = localVideoTrack
     }
 
     private fun createOffer(receiveVideo: Boolean) {
@@ -133,7 +150,10 @@ class WebRtcCallManager(private val context: Context) {
             "offer" -> {
                 val sdp = payload["sdp"]?.jsonPrimitive?.content ?: return
                 if (peerConnection == null) startCall(false, chatId)
-                peerConnection?.setRemoteDescription(SdpObserverAdapter(), SessionDescription(SessionDescription.Type.OFFER, sdp))
+                peerConnection?.setRemoteDescription(
+                    SdpObserverAdapter(),
+                    SessionDescription(SessionDescription.Type.OFFER, sdp),
+                )
                 peerConnection?.createAnswer(object : SdpObserverAdapter() {
                     override fun onCreateSuccess(answer: SessionDescription?) {
                         if (answer == null) return
@@ -146,10 +166,15 @@ class WebRtcCallManager(private val context: Context) {
                     }
                 }, MediaConstraints())
             }
+
             "answer" -> {
                 val sdp = payload["sdp"]?.jsonPrimitive?.content ?: return
-                peerConnection?.setRemoteDescription(SdpObserverAdapter(), SessionDescription(SessionDescription.Type.ANSWER, sdp))
+                peerConnection?.setRemoteDescription(
+                    SdpObserverAdapter(),
+                    SessionDescription(SessionDescription.Type.ANSWER, sdp),
+                )
             }
+
             "ice" -> {
                 val candidate = payload["candidate"]?.jsonPrimitive?.content ?: return
                 val sdpMid = payload["sdpMid"]?.jsonPrimitive?.content ?: ""
@@ -183,6 +208,9 @@ class WebRtcCallManager(private val context: Context) {
         videoCapturer = null
         localVideoTrack?.dispose()
         localVideoTrack = null
+        remoteVideoTrack = null
+        _localVideo.value = null
+        _remoteVideo.value = null
         localAudioTrack?.dispose()
         peerConnection?.close()
         peerConnection = null
@@ -203,8 +231,13 @@ class WebRtcCallManager(private val context: Context) {
     private open class SdpObserverAdapter : SdpObserver {
         override fun onCreateSuccess(sdp: SessionDescription?) = Unit
         override fun onSetSuccess() = Unit
-        override fun onCreateFailure(p0: String?) { Log.w(TAG, "SDP create fail: $p0") }
-        override fun onSetFailure(p0: String?) { Log.w(TAG, "SDP set fail: $p0") }
+        override fun onCreateFailure(p0: String?) {
+            Log.w(TAG, "SDP create fail: $p0")
+        }
+
+        override fun onSetFailure(p0: String?) {
+            Log.w(TAG, "SDP set fail: $p0")
+        }
     }
 
     companion object {

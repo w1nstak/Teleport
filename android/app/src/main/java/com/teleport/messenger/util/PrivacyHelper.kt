@@ -41,7 +41,6 @@ object PrivacyHelper {
         if (viewerIsSelf && hideOwnOnline) return "offline"
         if (!canSeeLastSeen(user, viewerIsSelf, isContact)) return "offline"
         return when {
-            user.status.isNotBlank() -> user.status
             user.isOnline -> "online"
             else -> "offline"
         }

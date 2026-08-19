@@ -62,31 +62,31 @@ val LightAppColors = AppThemeColors(
 )
 
 val DarkAppColors = AppThemeColors(
-    screenBg = Color(0xFF0D0F14),
-    cardBg = Color(0xFF1A1D28),
-    elevatedSurface = Color(0xFF222633),
-    textPrimary = Color(0xFFE8ECF4),
-    textMuted = Color(0xFF7A8194),
-    divider = Color(0xFF2A2F3D),
-    inputBg = Color(0xFF252A36),
-    bubbleIncoming = Color(0xFF252A36),
-    bubbleOutgoing = Color(0xFF4A69FF),
-    accentBlue = Color(0xFF6B84FF),
-    accentRed = Color(0xFFFF453A),
-    accentPink = Color(0xFFFF6DAD),
-    onlineGreen = Color(0xFF32D74B),
-    chevron = Color(0xFF5C6370),
-    dateDividerBg = Color(0xFF252A36),
-    infoButtonBg = Color(0xFF2A3040),
-    searchBorder = Color(0xFF353B4A),
-    creditGreen = Color(0xFF32D74B),
-    debitOrange = Color(0xFFFF9F0A),
-    authGradientTop = Color(0xFF141824),
-    authGradientMid = Color(0xFF181C2A),
-    authGradientBottom = Color(0xFF0D0F14),
-    authInputBg = Color(0xFF252A36),
-    authTextPrimary = Color(0xFFE8ECF4),
-    authTextSecondary = Color(0xFF8E95A8),
+    screenBg = Color(0xFF0A0A12),
+    cardBg = Color(0xFF13131F),
+    elevatedSurface = Color(0xFF1A1A28),
+    textPrimary = Color(0xFFF0EFFF),
+    textMuted = Color(0xFF6B69A0),
+    divider = Color(0xFF1C1C2C),
+    inputBg = Color(0xFF161623),
+    bubbleIncoming = Color(0xFF161623),
+    bubbleOutgoing = Color(0xFF3E8EFF),
+    accentBlue = Color(0xFF5FA8FF),
+    accentRed = Color(0xFFFF7A7A),
+    accentPink = Color(0xFFFF7CB8),
+    onlineGreen = Color(0xFF4FD9A8),
+    chevron = Color(0xFF4A4870),
+    dateDividerBg = Color(0xFF161623),
+    infoButtonBg = Color(0xFF1A1A28),
+    searchBorder = Color(0xFF2A2A45),
+    creditGreen = Color(0xFFC6FF3D),
+    debitOrange = Color(0xFFFF9F5F),
+    authGradientTop = Color(0xFF14141C),
+    authGradientMid = Color(0xFF0E0E14),
+    authGradientBottom = Color(0xFF0A0A12),
+    authInputBg = Color(0xFF161623),
+    authTextPrimary = Color(0xFFF0EFFF),
+    authTextSecondary = Color(0xFF8280B4),
 )
 
 /** SlimChat — тёмный iOS-стиль как в @slim_chat */
@@ -119,6 +119,15 @@ val SlimChatAppColors = AppThemeColors(
 )
 
 val LocalAppThemeColors = staticCompositionLocalOf { LightAppColors }
+
+data class ChatAccent(
+    val primary: Color,
+    val secondary: Color,
+)
+
+val LocalChatAccent = staticCompositionLocalOf {
+    ChatAccent(Color(0xFF5B5BF0), Color(0xFF8B5CF6))
+}
 
 object TeleportAppTheme {
     val colors: AppThemeColors

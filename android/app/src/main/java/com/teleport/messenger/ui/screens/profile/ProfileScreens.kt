@@ -19,12 +19,20 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,11 +44,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.teleport.messenger.data.entity.UserEntity
+import com.teleport.messenger.ui.theme.ManropeFontFamily
+import com.teleport.messenger.ui.theme.UnboundedFontFamily
 import com.teleport.messenger.util.PrivacyHelper
 import com.teleport.messenger.viewmodel.TeleportViewModel
 
 private object ProfileMockPalette {
-    val Bg = Color(0xFF0E0D12)
+    val Bg = Color(0xFF0A0A12)
     val Card = Color(0xFF17151C)
     val Hairline = Color(0xFF2A2732)
     val Accent = Color(0xFF7C6CF5)
@@ -79,12 +89,21 @@ fun ProfileScreen(
     val online = user?.isOnline == true && settings?.hideOnlineStatus != true
     val statusText = if (online) "в сети" else PrivacyHelper.onlineStatus(user!!, true, false, false)
     val bio = user?.bio?.takeIf { it.isNotBlank() } ?: "—"
-    val music = user?.status?.takeIf { it.isNotBlank() } ?: "без названия — 24635259"
+    val music = user?.status?.takeIf { it.isNotBlank() }
     val phoneHidden = account?.phone.isNullOrBlank() ||
         account?.phone?.startsWith("web:") == true ||
         user?.anonymousMode == true
     val phoneValue = if (phoneHidden) "Скрыт" else (account?.phone ?: "Скрыт")
     var menuOpen by remember { mutableStateOf(false) }
+    var showSongPicker by remember { mutableStateOf(false) }
+    val profileProgress = remember(user?.isPremium, user?.avatarUri, username, bio) {
+        var p = 0.25f
+        if (!username.isNullOrBlank()) p += 0.2f
+        if (bio != "—") p += 0.2f
+        if (!user?.avatarUri.isNullOrBlank()) p += 0.2f
+        if (user?.isPremium == true) p += 0.15f
+        p.coerceIn(0.25f, 1f)
+    }
 
     Column(
         Modifier
@@ -98,7 +117,7 @@ fun ProfileScreen(
             statusText = statusText,
             online = online,
             showBadge = user?.isPremium == true || username.equals("w1nst", ignoreCase = true),
-            progress = 0.38f,
+            progress = profileProgress,
             onBack = onBack,
             onEdit = onEdit,
             onMore = { menuOpen = true },
@@ -114,6 +133,10 @@ fun ProfileScreen(
                     DropdownMenuItem(text = { Text("Стикеры") }, onClick = { menuOpen = false; onStickers() })
                     DropdownMenuItem(text = { Text("Заблокированные") }, onClick = { menuOpen = false; onBlocked() })
                     DropdownMenuItem(text = { Text("Аккаунты") }, onClick = { menuOpen = false; onAccounts() })
+                    DropdownMenuItem(
+                        text = { Text("Сменить песню") },
+                        onClick = { menuOpen = false; showSongPicker = true },
+                    )
                 }
             },
         )
@@ -128,9 +151,18 @@ fun ProfileScreen(
                 icon = Icons.Outlined.MusicNote,
                 iconBg = Color(0x297C6CF5),
                 iconTint = ProfileMockPalette.PurpleIc,
-                label = "Музыка",
-                value = music,
-                trailing = { MusicWaveBars() },
+                label = "Музыка профиля",
+                value = music ?: "Не выбрана",
+                trailing = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        MusicWaveBars()
+                        ProfileSongChangeButton(onClick = { showSongPicker = true })
+                    }
+                },
+                onClick = { showSongPicker = true },
             )
             ProfileInfoCard(
                 icon = Icons.Filled.Edit,
@@ -148,6 +180,17 @@ fun ProfileScreen(
                 value = phoneValue,
             )
         }
+    }
+
+    if (showSongPicker && user != null) {
+        ProfileSongPickerSheet(
+            current = user!!.status,
+            onDismiss = { showSongPicker = false },
+            onSave = { song ->
+                vm.updateProfile(user!!.copy(status = song.trim()))
+                showSongPicker = false
+            },
+        )
     }
 }
 
@@ -366,6 +409,176 @@ private fun ProfileInfoCard(
 }
 
 @Composable
+private fun ProfileSongChangeButton(onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(30.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0x247C6CF5))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Filled.Sync,
+            contentDescription = "Сменить песню",
+            tint = ProfileMockPalette.PurpleIc,
+            modifier = Modifier.size(15.dp),
+        )
+    }
+}
+
+private val SuggestedProfileSongs = listOf(
+    "без названия — 24635259",
+    "The Weeknd — Blinding Lights",
+    "Billie Eilish — lovely",
+    "Imagine Dragons — Believer",
+    "Måneskin — Beggin'",
+    "Miyagi & Andy Panda — I Got Love",
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProfileSongPickerSheet(
+    current: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var draft by remember { mutableStateOf(current.ifBlank { "" }) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = ProfileMockPalette.Card,
+        contentColor = ProfileMockPalette.Text,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                "Песня профиля",
+                fontFamily = UnboundedFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 18.sp,
+                color = ProfileMockPalette.Text,
+            )
+            Text(
+                "Будет видна на вашей странице",
+                fontFamily = ManropeFontFamily,
+                fontSize = 13.sp,
+                color = ProfileMockPalette.TextDim,
+            )
+
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = {
+                    Text("Исполнитель — трек", color = ProfileMockPalette.TextDim)
+                },
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = ProfileMockPalette.Accent,
+                    unfocusedBorderColor = ProfileMockPalette.Hairline,
+                    focusedContainerColor = ProfileMockPalette.Bg,
+                    unfocusedContainerColor = ProfileMockPalette.Bg,
+                    focusedTextColor = ProfileMockPalette.Text,
+                    unfocusedTextColor = ProfileMockPalette.Text,
+                    cursorColor = ProfileMockPalette.Accent,
+                ),
+            )
+
+            SuggestedProfileSongs.forEach { song ->
+                val selected = draft.equals(song, ignoreCase = true)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            if (selected) Color(0x247C6CF5) else Color.Transparent,
+                        )
+                        .border(
+                            1.dp,
+                            if (selected) ProfileMockPalette.Accent.copy(0.45f) else ProfileMockPalette.Hairline,
+                            RoundedCornerShape(14.dp),
+                        )
+                        .clickable { draft = song }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Outlined.MusicNote,
+                        null,
+                        tint = ProfileMockPalette.PurpleIc,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        song,
+                        modifier = Modifier.weight(1f),
+                        fontFamily = ManropeFontFamily,
+                        fontSize = 14.sp,
+                        color = ProfileMockPalette.Text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (selected) {
+                        Icon(
+                            Icons.Filled.Check,
+                            null,
+                            tint = ProfileMockPalette.Accent,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                TextButton(
+                    onClick = { onSave("") },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Убрать", color = ProfileMockPalette.TextDim, fontFamily = ManropeFontFamily)
+                }
+                Box(
+                    Modifier
+                        .weight(1.4f)
+                        .height(46.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(ProfileMockPalette.Accent, ProfileMockPalette.Accent2),
+                            ),
+                        )
+                        .clickable { onSave(draft) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "Сохранить",
+                        fontFamily = ManropeFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        color = Color.White,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun MusicWaveBars() {
     val heights = listOf(6f, 14f, 9f, 16f, 7f)
     val transition = rememberInfiniteTransition(label = "musicWave")
@@ -408,6 +621,7 @@ fun ContactProfileScreen(
     val chat by vm.chat(chatId).collectAsState(initial = null)
     val me by vm.currentUser().collectAsState(initial = null)
     var contact by remember { mutableStateOf<UserEntity?>(null) }
+    var menuOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(chatId, me?.id) {
         me?.id?.let { id -> vm.getContactForChat(chatId, id) { contact = it } }
@@ -436,11 +650,47 @@ fun ContactProfileScreen(
             statusText = statusText,
             online = online,
             showBadge = displayUser.isPremium,
-            progress = 0.38f,
+            progress = 0.55f,
             onBack = onBack,
             onEdit = onMessage,
-            onMore = {},
-            moreMenu = {},
+            onMore = { menuOpen = true },
+            moreMenu = {
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Написать") },
+                        onClick = { menuOpen = false; onMessage() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Аудиозвонок") },
+                        onClick = { menuOpen = false; onCall("voice") },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Видеозвонок") },
+                        onClick = { menuOpen = false; onCall("video") },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (chat?.isPinned == true) "Открепить" else "Закрепить") },
+                        onClick = {
+                            menuOpen = false
+                            chat?.let { vm.pinChat(it.id, !it.isPinned) }
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if ((chat?.muteUntil ?: 0L) > 0L) "Включить звук" else "Без звука") },
+                        onClick = {
+                            menuOpen = false
+                            chat?.let { vm.muteChat(it.id, it.muteUntil <= 0L) }
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("В архив") },
+                        onClick = {
+                            menuOpen = false
+                            chat?.let { vm.archiveChat(it.id, true); onBack() }
+                        },
+                    )
+                }
+            },
         )
         Column(
             Modifier

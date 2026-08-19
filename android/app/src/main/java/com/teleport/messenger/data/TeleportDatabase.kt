@@ -26,7 +26,7 @@ class Converters {
         MarketplaceTradeEntity::class, BlockedUserEntity::class, ReportEntity::class,
         CallEntity::class, AppSettingsEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)

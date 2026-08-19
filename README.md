@@ -1,66 +1,56 @@
-# Teleport — Android Messenger
+# Teleport
 
-Вся папка проекта Teleport. **APK лежит здесь:** `Teleport.apk`
+Мессенджер в стиле Telegram, но с плоским UI без "Liquid Glass" эффектов.
 
-## Быстрый старт
-
-| Действие | Файл |
-|----------|------|
-| **Установить APK** | `teleport/Teleport.apk` |
-| **Собрать APK** | `teleport/BUILD_APK.bat` |
-| **Запустить сервер** | `teleport/START_SERVER.bat` |
-| **Хостинг Amvera** | `teleport/AMVERA.md` |
-| **Хостинг (общее)** | `teleport/HOSTING.md` |
-
-Из корня `neon/` тоже работают: `BUILD_TELEPORT_APK.bat` и `START_TELEPORT.bat`.
-
-## Структура
+## Структура проекта
 
 ```
-teleport/
-  Teleport.apk          ← готовый APK (после сборки)
-  BUILD_APK.bat         ← собрать и обновить Teleport.apk
-  START_SERVER.bat      ← backend :8765
-  android/              ← исходники Android (Kotlin/Compose)
-  server/               ← FastAPI backend
-  README.md
-  SMS_SETUP.md
-  YANDEX_SETUP.md
-  FIREBASE_SMS_SETUP.md
+Teleport/
+├── TeleportApp.swift          — точка входа
+├── Theme/
+│   └── TeleportTheme.swift    — цвета, стили (без blur/прозрачностей)
+├── Models/
+│   ├── User.swift
+│   ├── Chat.swift
+│   └── Message.swift
+├── Services/
+│   ├── AuthService.swift      — авторизация (заглушка, подключи Firebase/Supabase)
+│   ├── ChatService.swift      — загрузка/создание чатов
+│   └── MessageService.swift   — сообщения + realtime
+├── Views/
+│   ├── MainTabView.swift
+│   ├── Auth/
+│   │   └── LoginView.swift
+│   ├── Chats/
+│   │   ├── ChatsListView.swift
+│   │   └── ContactsView.swift
+│   ├── Chat/
+│   │   └── ChatView.swift
+│   └── Settings/
+│       └── SettingsView.swift
+└── Components/                — переиспользуемые UI-компоненты
 ```
 
-## Сборка вручную
+## Как запустить
 
-```powershell
-cd teleport\android
-.\gradlew.bat assembleDebug
-copy app\build\outputs\apk\debug\app-debug.apk ..\Teleport.apk
-```
+1. Открой проект в Xcode (создай новый iOS App проект и скопируй файлы)
+2. Минимальная версия iOS: 16.0
+3. Замени заглушки в Services/ на реальный backend (Firebase / Supabase)
 
-## Сервер
+## Дизайн-принципы
 
-```powershell
-cd teleport\server
-pip install -r requirements.txt
-python main.py
-```
+- Никаких blur / прозрачностей / glass-эффектов
+- Сплошные (solid) фоны
+- Простые скругления
+- Минималистичные анимации
+- Плоский, чистый интерфейс
 
-**Локально:** `http://localhost:8765`  
-**iPhone/Android в продакшене:** облачный HTTPS — см. **[HOSTING.md](HOSTING.md)**
+## Roadmap
 
-```powershell
-.\setup_public_url.ps1 https://api.ВАШ-ДОМЕН.ru
-```
-
-## Первый запуск
-
-1. Запустите `START_SERVER.bat` (для общения с друзьями)
-2. Установите `Teleport.apk` на телефон
-3. Зарегистрируйтесь по номеру → чат «Teleport» с приветствием
-4. Задайте @username → найдите друга через поиск
-
-## Стек
-
-- Kotlin + Jetpack Compose, Room, Retrofit, WebSocket, WebRTC
-- FastAPI + SQLite backend
-- Android 10+ (API 29+)
+- [x] MVP: вход, список чатов, экран чата, отправка текста
+- [ ] Firebase/Supabase интеграция (realtime)
+- [ ] Отправка фото/голосовых
+- [ ] Группы и каналы
+- [ ] Push-уведомления (APNs)
+- [ ] E2E шифрование
+- [ ] Звонки (голос/видео)

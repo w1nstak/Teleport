@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -30,6 +31,7 @@ import com.teleport.messenger.ui.screens.main.*
 import com.teleport.messenger.ui.screens.settings.*
 import com.teleport.messenger.ui.strings.LocalAppStrings
 import com.teleport.messenger.ui.strings.mergeAppStrings
+import com.teleport.messenger.ui.theme.TeleportMotion
 import com.teleport.messenger.ui.theme.TeleportTheme
 import com.teleport.messenger.util.AppLockGate
 import com.teleport.messenger.viewmodel.TeleportViewModel
@@ -69,6 +71,7 @@ object Routes {
     const val FOLDERS = "folders"
     const val STICKERS = "stickers"
     const val HELP = "help"
+    const val ABOUT = "about"
     const val ADMIN = "admin"
 
     fun chat(id: String) = "chat/${Uri.encode(id)}"
@@ -80,9 +83,21 @@ object Routes {
     fun decodeRouteArg(value: String?): String? = value?.let { Uri.decode(it) }
 }
 
+private val MainTabs = setOf(Routes.CHATS, Routes.CONTACTS, Routes.SETTINGS)
+
+/** Bottom tabs: keep one instance each, restore scroll/state when switching. */
+private fun NavHostController.navigateMainTab(route: String) {
+    navigate(route) {
+        popUpTo(Routes.CHATS) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
 @Composable
 fun TeleportApp() {
-    val app = LocalContext.current.applicationContext as TeleportApplication
+    val context = LocalContext.current
+    val app = context.applicationContext as TeleportApplication
     val vm: TeleportViewModel = viewModel(factory = TeleportViewModel.Factory(app.repository, null))
     val nav = rememberNavController()
     val account by vm.activeAccount.collectAsState()
@@ -107,8 +122,8 @@ fun TeleportApp() {
 
     TeleportTheme(
         themeMode = settings?.themeMode ?: "system",
-        colorThemeId = settings?.colorThemeId ?: "slimchat",
-        useDynamicColor = settings?.useDynamicColor ?: true,
+        colorThemeId = settings?.colorThemeId ?: "violet",
+        useDynamicColor = settings?.useDynamicColor ?: false,
     ) {
         val appStrings = remember(settings?.localeOverridesJson) {
             mergeAppStrings(settings?.localeOverridesJson)
@@ -125,11 +140,21 @@ fun TeleportApp() {
                 startDestination = if (account != null) Routes.CHATS else Routes.AUTH,
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFF000000)),
-                enterTransition = { fadeIn(tween(280)) },
-                exitTransition = { fadeOut(tween(220)) },
-                popEnterTransition = { fadeIn(tween(280)) },
-                popExitTransition = { fadeOut(tween(220)) },
+                    .background(Color(0xFF0A0A12)),
+                enterTransition = {
+                    val to = targetState.destination.route
+                    val from = initialState.destination.route
+                    if (to in MainTabs && from in MainTabs) TeleportMotion.tabEnter()
+                    else TeleportMotion.pushEnter()
+                },
+                exitTransition = {
+                    val to = targetState.destination.route
+                    val from = initialState.destination.route
+                    if (to in MainTabs && from in MainTabs) TeleportMotion.tabExit()
+                    else TeleportMotion.pushExit()
+                },
+                popEnterTransition = { TeleportMotion.popEnter() },
+                popExitTransition = { TeleportMotion.popExit() },
             ) {
                 composable(Routes.AUTH) {
                     TeleportAuthScreen(
@@ -170,18 +195,19 @@ fun TeleportApp() {
                             nav.navigate(Routes.chat(chatId)) { launchSingleTop = true }
                         },
                         onChats = {},
-                        onContacts = { nav.navigate(Routes.CONTACTS) { launchSingleTop = true } },
-                        onSettings = { nav.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                        onContacts = { nav.navigateMainTab(Routes.CONTACTS) },
+                        onSettings = { nav.navigateMainTab(Routes.SETTINGS) },
                         onArchive = { nav.navigate(Routes.ARCHIVE) },
                         onSearch = { nav.navigate(Routes.SEARCH_USERS) },
+                        onCalls = { nav.navigate(Routes.CALLS) },
                     )
                 }
                 composable(Routes.CONTACTS) {
                     ContactsScreen(
                         vm,
-                        onChats = { nav.navigate(Routes.CHATS) { launchSingleTop = true } },
+                        onChats = { nav.navigateMainTab(Routes.CHATS) },
                         onContacts = {},
-                        onSettings = { nav.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                        onSettings = { nav.navigateMainTab(Routes.SETTINGS) },
                         onOpenChat = { nav.navigate(Routes.chat(it)) },
                         onSearch = { nav.navigate(Routes.SEARCH_USERS) },
                     )
@@ -191,6 +217,7 @@ fun TeleportApp() {
                         vm,
                         onBack = { nav.popBackStack() },
                         onOpenChat = { nav.navigate(Routes.chat(it)) },
+                        onCall = { chatId, type -> nav.navigate(Routes.call(chatId, type)) },
                     )
                 }
                 composable(Routes.ARCHIVE) {
@@ -223,8 +250,8 @@ fun TeleportApp() {
                 }
                 composable(Routes.SETTINGS) {
                     SettingsScreen(vm,
-                        onChats = { nav.navigate(Routes.CHATS) { launchSingleTop = true } },
-                        onContacts = { nav.navigate(Routes.CONTACTS) { launchSingleTop = true } },
+                        onChats = { nav.navigateMainTab(Routes.CHATS) },
+                        onContacts = { nav.navigateMainTab(Routes.CONTACTS) },
                         onFavorites = {
                             vm.openSavedChat { chatId ->
                                 nav.navigate(Routes.chat(chatId)) { launchSingleTop = true }
@@ -241,6 +268,19 @@ fun TeleportApp() {
                         onPremium = { nav.navigate(Routes.PREMIUM) },
                         onStars = { nav.navigate(Routes.ISKRY) },
                         onHelp = { nav.navigate(Routes.HELP) },
+                        onAbout = { nav.navigate(Routes.ABOUT) },
+                        onInvite = {
+                            val share = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(
+                                    android.content.Intent.EXTRA_TEXT,
+                                    "Присоединяйся ко мне в Teleport Messenger — защищённые чаты и звонки.",
+                                )
+                            }
+                            context.startActivity(
+                                android.content.Intent.createChooser(share, "Пригласить друзей"),
+                            )
+                        },
                         onLogout = {
                             vm.logout {
                                 nav.navigate(Routes.AUTH) {
@@ -313,6 +353,7 @@ fun TeleportApp() {
                 composable(Routes.FOLDERS) { FoldersScreen(vm, onBack = { nav.popBackStack() }) }
                 composable(Routes.STICKERS) { StickersScreen(onBack = { nav.popBackStack() }) }
                 composable(Routes.HELP) { HelpScreen(onBack = { nav.popBackStack() }) }
+                composable(Routes.ABOUT) { AboutScreen(onBack = { nav.popBackStack() }) }
                 composable(Routes.SEARCH_USERS) {
                     SearchUsersScreen(
                         vm,

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teleport — Настройки</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&display=swap');
+  :root{
+    --bg:#0A0A12; --card:#13131F; --border:#22223A; --text:#F0EFFF; --muted:#6B69A0;
+    --label:#5C5A88; --chevron:#4A4870; --spark:#C6FF3D; --hair:#1C1C2C;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#050508;font-family:Inter,sans-serif;display:flex;justify-content:center;padding:28px 12px;min-height:100vh;}
+  .phone{
+    width:360px;height:720px;background:var(--bg);border-radius:36px;overflow:hidden;
+    box-shadow:0 0 0 8px #000,0 24px 70px rgba(0,0,0,.65);color:var(--text);
+    display:flex;flex-direction:column;position:relative;
+  }
+  .title{padding:20px 18px 4px;font-size:23px;font-weight:800;font-family:Manrope,sans-serif;letter-spacing:-.4px;flex-shrink:0;}
+  #body{padding:14px 14px 8px;flex:1;overflow-y:auto;}
+  .navbar-wrap{padding:8px 20px 22px;display:flex;justify-content:center;flex-shrink:0;
+    background:linear-gradient(180deg,transparent,rgba(10,10,18,.95));}
+  .navbar{
+    display:flex;align-items:center;gap:4px;padding:7px;border-radius:999px;
+    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+    box-shadow:0 20px 44px rgba(0,0,0,.45),0 1px 0 rgba(255,255,255,.06) inset;
+  }
+  .nav-item{display:flex;align-items:center;gap:7px;padding:10px 15px;border-radius:999px;color:#837E92;font-size:12.5px;font-weight:500;border:1px solid transparent;}
+  .nav-item svg{width:19px;height:19px;flex-shrink:0;}
+  .nav-item .label{max-width:0;overflow:hidden;opacity:0;white-space:nowrap;}
+  .nav-item.active{color:#fff;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);padding:10px 18px 10px 13px;}
+  .nav-item.active .label{max-width:90px;opacity:1;}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="title">Настройки</div>
+  <div id="body"></div>
+  <div class="navbar-wrap">
+    <div class="navbar">
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="8" r="3.4"/><path d="M3.5 20c0-3.2 2.5-5.5 5.5-5.5s5.5 2.3 5.5 5.5"/><circle cx="17" cy="8.5" r="2.6"/><path d="M15.5 14.7c2.6.4 4.5 2.4 4.5 5.3"/></svg>
+        <span class="label">Контакты</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 12c0 4-3.8 7-8.5 7-1 0-2-.13-2.9-.38L4 20l1.15-3.4C4.42 15.4 4 13.75 4 12c0-4 3.8-7 8.5-7S20 8 20 12Z"/></svg>
+        <span class="label">Чаты</span>
+      </div>
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="label">Настройки</span>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const ICONS = {
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>',
+  shield:'<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/>',
+  bell:'<path d="M12 3a5 5 0 0 0-5 5v3c0 1-.5 2-1.5 3h13c-1-1-1.5-2-1.5-3V8a5 5 0 0 0-5-5z"/><path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>',
+  message:'<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+  moon:'<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/>',
+  image:'<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5-4 4-3-3-5 5"/>',
+  sliders:'<line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2" fill="#0A0A12"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2" fill="#0A0A12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="7" cy="18" r="2" fill="#0A0A12"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1.3 1-1.3 1.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/>',
+  info:'<circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.7" r="0.6" fill="currentColor" stroke="none"/>',
+  userplus:'<circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/>',
+  logout:'<path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3"/><path d="M16 17l5-5-5-5"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  chevron:'<path d="M9 6l6 6-6 6"/>',
+  database:'<ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+  spark:'<path d="M12 2C12 8 16 12 22 12C16 12 12 16 12 22C12 16 8 12 2 12C8 12 12 8 12 2Z" fill="currentColor" stroke="none"/>',
+  admin:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'
+};
+function svg(name,size=17,color="#fff"){return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;}
+function chevron(){return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4A4870" stroke-width="2">${ICONS.chevron}</svg>`;}
+function toggle(on){return `<div style="width:42px;height:25px;border-radius:13px;position:relative;flex-shrink:0;background:${on?'linear-gradient(135deg,#5FA8FF,#2E5FE0)':'#232338'};border:1px solid ${on?'transparent':'#33324f'};"><div style="position:absolute;top:2px;left:${on?'19px':'2px'};width:19px;height:19px;border-radius:50%;background:#fff;"></div></div>`;}
+function row(r){return `<div style="display:flex;align-items:center;gap:12px;padding:11px 8px;"><div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(150deg,${r.grad[0]},${r.grad[1]});display:flex;align-items:center;justify-content:center;flex-shrink:0;">${svg(r.icon)}</div><div style="flex:1;font-size:15px;font-weight:600;font-family:Manrope,sans-serif;color:#F0EFFF;">${r.name}</div>${r.toggle?toggle(true):`<div style="display:flex;align-items:center;gap:6px;">${r.value?`<span style="font-size:13px;color:#6B69A0;">${r.value}</span>`:''}${chevron()}</div>`}</div>`;}
+function divider(){return `<div style="height:1px;background:#1C1C2C;margin-left:54px;"></div>`;}
+function group(label,rows){return `<div style="margin-bottom:20px;"><div style="font-size:12px;font-weight:700;font-family:Manrope,sans-serif;color:#5C5A88;letter-spacing:.8px;padding:0 10px 6px;">${label}</div><div style="background:#13131F;border:1px solid #22223A;border-radius:16px;padding:0 10px;">${rows.map((r,i)=>row(r)+(i<rows.length-1?divider():'')).join('')}</div></div>`;}
+
+const profile=`<div style="display:flex;align-items:center;gap:12px;background:#13131F;border:1px solid #22223A;border-radius:16px;padding:12px 14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:linear-gradient(150deg,#5FA8FF,#2E5FE0);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;font-family:Manrope,sans-serif;color:#fff;">W1</div><div style="flex:1;"><div style="font-size:15px;font-weight:700;font-family:Manrope,sans-serif;">Мой профиль</div><div style="font-size:12px;font-family:'JetBrains Mono',monospace;color:#6B69A0;margin-top:1px;">@w1nst</div></div>${chevron()}</div>`;
+const balance=`<div style="display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#221936,#14141C);border:1px solid #2C2A45;border-radius:16px;padding:14px 16px;margin-bottom:20px;"><div style="width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#E4FF9C,#C6FF3D 60%,#8FCC1C);display:flex;align-items:center;justify-content:center;">${svg('spark',16,'#0B0B10')}</div><div style="flex:1;"><div style="font-size:12px;color:#6B69A0;">Баланс</div><div style="font-size:17px;font-weight:800;font-family:Manrope,sans-serif;">1 240 искр</div></div><div style="background:#C6FF3D;color:#0B0B10;font-size:13px;font-weight:700;font-family:Manrope,sans-serif;padding:8px 16px;border-radius:12px;">Пополнить</div></div>`;
+const logout=`<div style="background:#13131F;border:1px solid #2A1F2A;border-radius:16px;padding:0 10px;margin-bottom:14px;"><div style="display:flex;align-items:center;gap:12px;padding:12px 8px;"><div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(150deg,#FF6F6F,#D93A3A);display:flex;align-items:center;justify-content:center;">${svg('logout')}</div><div style="flex:1;font-size:15px;font-weight:600;color:#FF7A7A;">Выйти</div></div></div><div style="text-align:center;font-size:11px;font-family:'JetBrains Mono',monospace;color:#3F3D5E;padding-bottom:10px;">Teleport v6.2.1</div>`;
+
+document.getElementById('body').innerHTML =
+  profile +
+  group('АККАУНТ',[
+    {icon:'user',grad:['#5FA8FF','#2E5FE0'],name:'Профиль'},
+    {icon:'shield',grad:['#7C6FFF','#4A3AD6'],name:'Конфиденциальность'},
+    {icon:'bell',grad:['#FF9F5F','#E0692E'],name:'Уведомления',toggle:true},
+    {icon:'message',grad:['#4FD9A8','#1FA878'],name:'Чаты'},
+    {icon:'database',grad:['#5FD1FF','#2E9EE0'],name:'Хранилище',value:'2.4/5 ГБ'},
+  ]) +
+  group('АДМИНИСТРИРОВАНИЕ',[
+    {icon:'admin',grad:['#FF6F9F','#D6316E'],name:'Админ-панель'},
+  ]) +
+  balance +
+  group('ОФОРМЛЕНИЕ',[
+    {icon:'moon',grad:['#B18BFF','#7A52E0'],name:'Тема',value:'Тёмная'},
+    {icon:'image',grad:['#FF7CB8','#E03E85'],name:'Обои чатов'},
+    {icon:'sliders',grad:['#5FD1FF','#2E9EE0'],name:'Размер шрифта',value:'Средний'},
+  ]) +
+  group('ПОДДЕРЖКА',[
+    {icon:'help',grad:['#8280B4','#5C5A88'],name:'Центр помощи'},
+    {icon:'info',grad:['#8280B4','#5C5A88'],name:'О приложении'},
+    {icon:'userplus',grad:['#5FA8FF','#2E5FE0'],name:'Пригласить друзей'},
+  ]) +
+  logout;
+</script>
+</body>
+</html>

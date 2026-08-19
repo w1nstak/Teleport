@@ -294,6 +294,7 @@ class TeleportViewModel(
         caption: String = "",
         durationMs: Long = 0L,
         replyTo: String? = null,
+        fileName: String? = null,
     ) = launch {
         val url = repo.uploadMediaFile(file, mime)
         if (url == null) {
@@ -301,7 +302,37 @@ class TeleportViewModel(
             return@launch
         }
         runCatching {
-            repo.sendMessage(chatId, userId, type, caption, url, replyToId = replyTo, durationMs = durationMs)
+            repo.sendMessage(
+                chatId = chatId,
+                senderId = userId,
+                type = type,
+                text = caption,
+                mediaUri = url,
+                replyToId = replyTo,
+                durationMs = durationMs,
+                fileName = fileName ?: file.name,
+                fileSize = file.length(),
+            )
+        }.onFailure { _error.value = ApiErrors.message(it) }
+    }
+
+    fun sendLocation(
+        chatId: String,
+        userId: String,
+        latitude: Double,
+        longitude: Double,
+        replyTo: String? = null,
+    ) = launchQuiet {
+        runCatching {
+            repo.sendMessage(
+                chatId = chatId,
+                senderId = userId,
+                type = MessageType.LOCATION,
+                text = "%.5f, %.5f".format(latitude, longitude),
+                latitude = latitude,
+                longitude = longitude,
+                replyToId = replyTo,
+            )
         }.onFailure { _error.value = ApiErrors.message(it) }
     }
 
@@ -406,6 +437,12 @@ class TeleportViewModel(
     fun startCall(chatId: String, type: String, isGroup: Boolean = false) = launchQuiet {
         currentUser().first()?.let { repo.startCall(chatId, it.id, type, isGroup) }
     }
+
+    fun endActiveCall(chatId: String) = launchQuiet { repo.endActiveCall(chatId) }
+
+    fun deleteFolder(folderId: String) = launchQuiet { repo.deleteFolder(folderId) }
+
+    fun renameFolder(folderId: String, name: String) = launchQuiet { repo.renameFolder(folderId, name) }
 
     fun transcribe(msgId: String, callback: (String?) -> Unit) = launchQuiet {
         val user = currentUser().first() ?: return@launchQuiet

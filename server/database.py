@@ -44,6 +44,7 @@ def init_db() -> None:
             display_name TEXT NOT NULL,
             username TEXT,
             bio TEXT DEFAULT '',
+            status TEXT DEFAULT '',
             is_online INTEGER DEFAULT 0,
             last_seen INTEGER DEFAULT 0,
             is_premium INTEGER DEFAULT 0
@@ -77,5 +78,10 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_chat_members_user ON chat_members(user_id);
         """
     )
+    # Best-effort migrations for existing DBs
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN status TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()

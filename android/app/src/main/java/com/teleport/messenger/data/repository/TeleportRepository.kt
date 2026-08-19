@@ -99,12 +99,38 @@ class TeleportRepository(
 
     suspend fun initializeIfNeeded() = withContext(Dispatchers.IO) {
         refreshLocalChats()
-        if (giftDao.search("").isNotEmpty()) return@withContext
+        ensureMarketSellers()
+        if (giftDao.search("").isNotEmpty()) {
+            // gifts already seeded — still refresh marketplace listings if missing
+            if (marketDao.observeActive().first().isEmpty()) seedMarketplaceListings()
+            return@withContext
+        }
         seedGifts()
-        seedMarketplace()
+        seedMarketplaceListings()
     }
 
-    private suspend fun seedMarketplace() {
+    private suspend fun ensureMarketSellers() {
+        listOf(
+            Triple("u_demo1", "Магазин искр", "iskry_shop"),
+            Triple("u_demo2", "Коллекционер", "collector"),
+            Triple("u_demo3", "Teleport Store", "teleport_store"),
+        ).forEach { (id, name, username) ->
+            if (userDao.getById(id) == null) {
+                userDao.upsert(
+                    UserEntity(
+                        id = id,
+                        accountId = "acc_market_demo",
+                        displayName = name,
+                        username = username,
+                        starsBalance = 50_000,
+                        isOnline = false,
+                    ),
+                )
+            }
+        }
+    }
+
+    private suspend fun seedMarketplaceListings() {
         marketDao.upsertListing(MarketplaceListingEntity("ml1", "u_demo3", "g1", 75, "active"))
         marketDao.upsertListing(MarketplaceListingEntity("ml2", "u_demo2", "g4", 250, "active"))
         marketDao.upsertListing(MarketplaceListingEntity("ml3", "u_demo1", "g2", 120, "active"))
@@ -112,11 +138,11 @@ class TeleportRepository(
 
     private suspend fun seedGifts() {
         val gifts = listOf(
-            GiftEntity("g1", "Dolphin Leap", "Animated dolphin gift", "gift_dolphin", "anim_dolphin", 50, "rare", "animated", isCollectible = true),
-            GiftEntity("g2", "Star Burst", "Premium star explosion", "gift_star", "anim_star", 100, "epic", "premium", isLimited = true, stockRemaining = 500),
-            GiftEntity("g3", "Blue Wave", "Ocean wave animation", "gift_wave", "anim_wave", 25, "common", "nature"),
-            GiftEntity("g4", "Crystal Heart", "Collectible crystal", "gift_heart", null, 200, "legendary", "collectible", isCollectible = true, isLimited = true, stockRemaining = 100),
-            GiftEntity("g5", "Teleport Spark", "Signature spark gift", "gift_spark", "anim_spark", 75, "rare", "signature"),
+            GiftEntity("g1", "Прыжок дельфина", "Анимированный подарок-дельфин", "gift_dolphin", "anim_dolphin", 50, "rare", "animated", isCollectible = true),
+            GiftEntity("g2", "Вспышка искр", "Премиум-взрыв искр", "gift_spark", "anim_spark", 100, "epic", "premium", isLimited = true, stockRemaining = 500),
+            GiftEntity("g3", "Синяя волна", "Анимация океанской волны", "gift_wave", "anim_wave", 25, "common", "nature"),
+            GiftEntity("g4", "Кристальное сердце", "Коллекционный кристалл", "gift_heart", null, 200, "legendary", "collectible", isCollectible = true, isLimited = true, stockRemaining = 100),
+            GiftEntity("g5", "Искра Teleport", "Фирменный подарок Teleport", "gift_spark", "anim_spark", 75, "rare", "signature"),
         )
         gifts.forEach { giftDao.upsert(it) }
     }
@@ -351,37 +377,64 @@ class TeleportRepository(
     suspend fun register(phone: String, password: String, displayName: String): Result<UserEntity> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val accountId = UUID.randomUUID().toString()
-                val userId = UUID.randomUUID().toString()
-                val token = try {
-                    ApiClient.api.register(AuthRequest(phone, password, displayName)).token
-                } catch (_: Exception) {
-                    UUID.randomUUID().toString()
+                if (password.length < 8) throw IllegalArgumentException("Пароль: минимум 8 символов")
+                val resp = try {
+                    ApiClient.api.register(AuthRequest(phone, password, displayName))
+                } catch (e: Exception) {
+                    // Offline / local fallback so registration still works without server
+                    val accountId = UUID.randomUUID().toString()
+                    val userId = UUID.randomUUID().toString()
+                    val token = UUID.randomUUID().toString()
+                    accountDao.deactivateAll()
+                    accountDao.upsert(AccountEntity(accountId, phone, null, hashPassword(password), token, true))
+                    val user = UserEntity(userId, accountId, displayName, null, starsBalance = 100)
+                    userDao.upsert(user)
+                    settingsDao.upsert(AppSettingsEntity(accountId))
+                    sessionDao.upsert(
+                        SessionEntity(
+                            UUID.randomUUID().toString(),
+                            accountId,
+                            "This device",
+                            ipAddress = null,
+                            lastActive = System.currentTimeMillis(),
+                            isCurrent = true,
+                        ),
+                    )
+                    createDefaultChats(userId, displayName)
+                    return@runCatching user
                 }
-                accountDao.deactivateAll()
-                accountDao.upsert(AccountEntity(accountId, phone, null, hashPassword(password), token, true))
-                val user = UserEntity(userId, accountId, displayName, null, starsBalance = 100)
-                userDao.upsert(user)
-                settingsDao.upsert(AppSettingsEntity(accountId))
-                sessionDao.upsert(SessionEntity(UUID.randomUUID().toString(), accountId, "This device", ipAddress = null, lastActive = System.currentTimeMillis(), isCurrent = true))
-                createDefaultChats(userId, displayName)
-                user
+                applyServerAuth(resp, phone, displayName, createDemo = false, password = password)
+                userDao.getById(resp.userId)!!
             }
         }
 
     suspend fun login(phone: String, password: String): Result<UserEntity> =
         withContext(Dispatchers.IO) {
             runCatching {
+                // Prefer server auth so login works on a fresh device
+                val serverResult = runCatching {
+                    ApiClient.api.login(AuthRequest(phone, password))
+                }
+                if (serverResult.isSuccess) {
+                    val resp = serverResult.getOrThrow()
+                    applyServerAuth(
+                        resp,
+                        phone = resp.phone ?: phone,
+                        displayName = resp.displayName ?: phone,
+                        createDemo = false,
+                        password = password,
+                    )
+                    return@runCatching userDao.getById(resp.userId)!!
+                }
+                // Local fallback
                 val accounts = accountDao.observeAll().first()
                 val account = accounts.find { it.phone == phone && it.passwordHash == hashPassword(password) }
-                    ?: throw IllegalArgumentException("Invalid credentials")
-                val token = try {
-                    ApiClient.api.login(AuthRequest(phone, password)).token
-                } catch (_: Exception) {
-                    account.authToken ?: UUID.randomUUID().toString()
-                }
+                    ?: throw IllegalArgumentException(
+                        serverResult.exceptionOrNull()?.let { ApiErrors.message(it) }
+                            ?: "Неверный телефон или пароль",
+                    )
                 accountDao.deactivateAll()
-                accountDao.activate(account.id, token)
+                accountDao.activate(account.id, account.authToken ?: UUID.randomUUID().toString())
                 userDao.observeByAccount(account.id).first()!!
             }
         }
@@ -393,7 +446,7 @@ class TeleportRepository(
                     ApiClient.api.qrLogin(QrAuthRequest(qrToken, deviceName))
                 } catch (_: Exception) {
                     val acc = accountDao.observeActive().first() ?: throw IllegalStateException("No account")
-                    com.teleport.messenger.data.api.AuthResponse(acc.authToken ?: "", userDao.observeByAccount(acc.id).first()!!.id, acc.id)
+                    AuthResponse(acc.authToken ?: "", userDao.observeByAccount(acc.id).first()!!.id, acc.id)
                 }
                 accountDao.deactivateAll()
                 accountDao.activate(resp.accountId, resp.token)
@@ -404,9 +457,17 @@ class TeleportRepository(
     suspend fun recover(phone: String, newPassword: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
-                try { ApiClient.api.recover(AuthRequest(phone, newPassword)) } catch (_: Exception) {}
+                if (newPassword.length < 8) throw IllegalArgumentException("Пароль: минимум 8 символов")
+                try {
+                    ApiClient.api.recover(AuthRequest(phone, newPassword))
+                } catch (e: Exception) {
+                    // If no local account either — fail with API message
+                    val local = accountDao.observeAll().first().find { it.phone == phone }
+                    if (local == null) throw IllegalStateException(ApiErrors.message(e), e)
+                }
                 val accounts = accountDao.observeAll().first()
-                val account = accounts.find { it.phone == phone } ?: throw IllegalArgumentException("Account not found")
+                val account = accounts.find { it.phone == phone }
+                    ?: throw IllegalArgumentException("Аккаунт не найден на этом устройстве")
                 accountDao.upsert(account.copy(passwordHash = hashPassword(newPassword)))
             }
         }
@@ -602,8 +663,17 @@ class TeleportRepository(
             displayName = resp.displayName ?: displayName,
             username = resp.username ?: localUser?.username,
             bio = localUser?.bio ?: "",
+            status = localUser?.status ?: "",
             starsBalance = localUser?.starsBalance ?: 100,
             isPremium = localUser?.isPremium == true,
+            avatarUri = localUser?.avatarUri,
+            isOnline = localUser?.isOnline == true,
+            lastSeen = localUser?.lastSeen ?: 0L,
+            privacyLastSeen = localUser?.privacyLastSeen ?: "everyone",
+            privacyPhone = localUser?.privacyPhone ?: "contacts",
+            privacyPhoto = localUser?.privacyPhoto ?: "everyone",
+            anonymousMode = localUser?.anonymousMode == true,
+            anonymousAlias = localUser?.anonymousAlias,
         )
         userDao.upsert(user)
         if (settingsDao.observe(resp.accountId).first() == null) {
@@ -638,13 +708,15 @@ class TeleportRepository(
     }
 
     private suspend fun upsertUserDto(dto: UserDto) {
+        val existing = userDao.getById(dto.id)
         userDao.upsert(
             UserEntity(
                 id = dto.id,
-                accountId = "remote",
+                accountId = existing?.accountId ?: "remote",
                 displayName = dto.displayName,
                 username = dto.username,
                 bio = dto.bio,
+                status = dto.status.ifBlank { existing?.status ?: "" },
                 isOnline = dto.isOnline,
                 lastSeen = dto.lastSeen,
                 isPremium = dto.isPremium,
@@ -653,7 +725,6 @@ class TeleportRepository(
     }
 
     private suspend fun upsertRemoteUserLocally(userId: String) {
-        if (userDao.getById(userId) != null) return
         val token = ensureBackendSession() ?: return
         runCatching {
             ApiClient.api.getUser("Bearer $token", userId)
@@ -665,12 +736,27 @@ class TeleportRepository(
         val account = accountDao.observeActive().first() ?: return@withContext
         val me = userDao.observeByAccount(account.id).first() ?: return@withContext
         runCatching { ApiClient.api.listChats("Bearer $token") }.getOrNull()?.forEach { item ->
-            if (chatDao.getById(item.chatId) == null) return@forEach
+            val existing = chatDao.getById(item.chatId)
             chatDao.upsert(
                 ChatEntity(
                     id = item.chatId,
-                    type = runCatching { ChatType.valueOf(item.type) }.getOrDefault(ChatType.PRIVATE),
-                    title = item.title,
+                    type = runCatching { ChatType.valueOf(item.type) }.getOrDefault(existing?.type ?: ChatType.PRIVATE),
+                    title = item.title.ifBlank { existing?.title ?: "Чат" },
+                    avatarUri = existing?.avatarUri,
+                    description = existing?.description ?: "",
+                    memberCount = item.members.size.coerceAtLeast(existing?.memberCount ?: 0),
+                    lastMessagePreview = existing?.lastMessagePreview ?: "",
+                    lastMessageTime = existing?.lastMessageTime ?: 0L,
+                    unreadCount = existing?.unreadCount ?: 0,
+                    isPinned = existing?.isPinned ?: false,
+                    isArchived = existing?.isArchived ?: false,
+                    folderId = existing?.folderId,
+                    wallpaperUri = existing?.wallpaperUri,
+                    wallpaperAnimated = existing?.wallpaperAnimated ?: false,
+                    muteUntil = existing?.muteUntil ?: 0L,
+                    notificationSound = existing?.notificationSound,
+                    createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis(),
                 ),
             )
             item.members.forEach { memberId ->
@@ -687,7 +773,7 @@ class TeleportRepository(
             runCatching {
                 ApiClient.api.updateMe(
                     "Bearer $token",
-                    UpdateProfileRequest(user.displayName, user.username, user.bio),
+                    UpdateProfileRequest(user.displayName, user.username, user.bio, user.status),
                 )
             }
         }
@@ -712,6 +798,7 @@ class TeleportRepository(
                 ApiClient.api.searchUsers("Bearer $token", query).map { dto ->
                     UserEntity(
                         dto.id, "remote", dto.displayName, dto.username, dto.bio,
+                        status = dto.status,
                         isOnline = dto.isOnline, lastSeen = dto.lastSeen, isPremium = dto.isPremium,
                     )
                 }
@@ -855,6 +942,12 @@ class TeleportRepository(
         replyToId: String? = null,
         durationMs: Long = 0L,
         hasSpoiler: Boolean = false,
+        fileName: String? = null,
+        fileSize: Long = 0L,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        contactName: String? = null,
+        contactPhone: String? = null,
     ): MessageEntity = withContext(Dispatchers.IO) {
         val chat = chatDao.getById(chatId) ?: throw IllegalStateException("Chat not found")
         val account = accountDao.observeActive().first()
@@ -865,8 +958,21 @@ class TeleportRepository(
             }
         }
         val msg = MessageEntity(
-            UUID.randomUUID().toString(), chatId, senderId, type, text, mediaUri,
-            replyToId = replyToId, durationMs = durationMs, hasSpoiler = hasSpoiler,
+            id = UUID.randomUUID().toString(),
+            chatId = chatId,
+            senderId = senderId,
+            type = type,
+            text = text,
+            mediaUri = mediaUri,
+            fileName = fileName,
+            fileSize = fileSize,
+            durationMs = durationMs,
+            latitude = latitude,
+            longitude = longitude,
+            contactName = contactName,
+            contactPhone = contactPhone,
+            replyToId = replyToId,
+            hasSpoiler = hasSpoiler,
         )
         messageDao.upsert(msg)
         chatDao.updateLastMessage(chatId, previewFor(msg), msg.createdAt)
@@ -1023,7 +1129,21 @@ class TeleportRepository(
     }
 
     suspend fun endCall(callId: String) = withContext(Dispatchers.IO) {
-        // Call records updated via CallService
+        // preferred: end by chat via endActiveCall
+    }
+
+    suspend fun endActiveCall(chatId: String) = withContext(Dispatchers.IO) {
+        callDao.endActiveForChat(chatId, System.currentTimeMillis())
+    }
+
+    suspend fun deleteFolder(folderId: String) = withContext(Dispatchers.IO) {
+        chatFolderDao.delete(folderId)
+    }
+
+    suspend fun renameFolder(folderId: String, name: String) = withContext(Dispatchers.IO) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return@withContext
+        chatFolderDao.rename(folderId, trimmed)
     }
 
     suspend fun blockUser(accountId: String, userId: String) = withContext(Dispatchers.IO) {

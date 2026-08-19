@@ -136,6 +136,7 @@ class UpdateProfileRequest(BaseModel):
     displayName: Optional[str] = None
     username: Optional[str] = None
     bio: Optional[str] = None
+    status: Optional[str] = None
 
 
 # ---------- helpers ----------
@@ -147,12 +148,14 @@ def private_chat_id(user_a: str, user_b: str) -> str:
 
 
 def user_to_dict(row) -> dict:
+    keys = row.keys()
     return {
         "id": row["id"],
         "accountId": row["account_id"],
         "displayName": row["display_name"],
         "username": row["username"],
         "bio": row["bio"] or "",
+        "status": row["status"] if "status" in keys and row["status"] is not None else "",
         "isOnline": bool(row["is_online"]),
         "lastSeen": row["last_seen"] or 0,
         "isPremium": bool(row["is_premium"]),
@@ -179,8 +182,8 @@ def persist_user(user: dict) -> None:
     conn.execute(
         """
         INSERT OR REPLACE INTO users
-        (id, account_id, display_name, username, bio, is_online, last_seen, is_premium)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (id, account_id, display_name, username, bio, status, is_online, last_seen, is_premium)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             user["id"],
@@ -188,6 +191,7 @@ def persist_user(user: dict) -> None:
             user["displayName"],
             user.get("username"),
             user.get("bio", ""),
+            user.get("status", ""),
             1 if user.get("isOnline") else 0,
             user.get("lastSeen", 0),
             1 if user.get("isPremium") else 0,
@@ -626,6 +630,7 @@ def get_me(authorization: Optional[str] = Header(None)):
         "displayName": user["displayName"],
         "username": user.get("username"),
         "bio": user.get("bio", ""),
+        "status": user.get("status", ""),
         "isOnline": user.get("isOnline", False),
         "lastSeen": user.get("lastSeen", 0),
         "isPremium": user.get("isPremium", False),
@@ -650,6 +655,8 @@ def update_me(body: UpdateProfileRequest, authorization: Optional[str] = Header(
         user["displayName"] = body.displayName
     if body.bio is not None:
         user["bio"] = body.bio
+    if body.status is not None:
+        user["status"] = body.status
     persist_user(user)
     return get_me(authorization)
 
@@ -665,6 +672,7 @@ def get_user(user_id: str, authorization: Optional[str] = Header(None)):
         "displayName": user["displayName"],
         "username": user.get("username"),
         "bio": user.get("bio", ""),
+        "status": user.get("status", ""),
         "isOnline": user.get("isOnline", False),
         "lastSeen": user.get("lastSeen", 0),
         "isPremium": user.get("isPremium", False),
@@ -683,6 +691,7 @@ def search_users(q: str, authorization: Optional[str] = Header(None)):
             "displayName": u["displayName"],
             "username": u.get("username"),
             "bio": u.get("bio", ""),
+            "status": u.get("status", ""),
             "isOnline": u.get("isOnline", False),
             "lastSeen": u.get("lastSeen", 0),
             "isPremium": u.get("isPremium", False),

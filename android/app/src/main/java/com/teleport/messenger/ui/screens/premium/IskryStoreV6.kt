@@ -31,7 +31,7 @@ import com.teleport.messenger.ui.screens.settings.formatIskry
 import kotlin.math.min
 
 object IskryV6Palette {
-    val Bg = Color(0xFF0A0A0F)
+    val Bg = Color(0xFF0A0A12)
     val TextPrimary = Color(0xFFFAFAFF)
     val TextSecondary = Color(0xFFF5F4FF)
     val TextMuted = Color(0xFF8E8CB8)

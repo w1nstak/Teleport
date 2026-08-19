@@ -2,211 +2,73 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>Teleport</title>
-  <link rel="stylesheet" href="/assets/app.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teleport — эталон дизайна</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;600&display=swap" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh; background: #050508; color: #F0EFFF;
+      font-family: Inter, system-ui, sans-serif; padding: 40px 24px 60px;
+    }
+    h1 { font-family: Manrope, sans-serif; font-size: 28px; font-weight: 800; letter-spacing: -0.4px; }
+    .sub { color: #6B69A0; margin: 8px 0 28px; font-size: 15px; max-width: 640px; line-height: 1.45; }
+    .warn {
+      background: #2A1A20; border: 1px solid #4A2A32; color: #FFB0B0;
+      border-radius: 14px; padding: 14px 16px; margin-bottom: 28px; font-size: 14px; max-width: 640px;
+    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; max-width: 900px; }
+    a.card {
+      display: block; text-decoration: none; color: inherit;
+      background: #13131F; border: 1px solid #22223A; border-radius: 18px; padding: 20px;
+      transition: border-color .2s, transform .15s;
+    }
+    a.card:hover { border-color: #5FA8FF; transform: translateY(-2px); }
+    .tag {
+      display: inline-block; font-size: 11px; font-weight: 700; font-family: Manrope, sans-serif;
+      letter-spacing: .06em; color: #C6FF3D; background: rgba(198,255,61,.12);
+      padding: 4px 10px; border-radius: 999px; margin-bottom: 12px;
+    }
+    .tag.old { color: #FF8A8A; background: rgba(255,100,100,.12); }
+    .title { font-family: Manrope, sans-serif; font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .desc { font-size: 13px; color: #8280B4; line-height: 1.4; }
+  </style>
 </head>
 <body>
-  <object type="image/svg+xml" data="/assets/icons.svg" aria-hidden="true" class="svg-sprite"></object>
-
-  <div id="app">
-    <section id="view-auth" class="view auth-view">
-      <div class="auth-layout">
-        <header class="auth-brand">
-          <div class="brand-mark" aria-hidden="true"></div>
-          <span class="brand-name">Teleport</span>
-        </header>
-        <div class="segmented" role="tablist">
-          <button type="button" class="segment active" data-tab="login" role="tab">Вход</button>
-          <button type="button" class="segment" data-tab="register" role="tab">Регистрация</button>
-        </div>
-        <form id="form-login" class="auth-form">
-          <div class="field">
-            <label for="login-username">Имя пользователя</label>
-            <input id="login-username" autocomplete="username" placeholder="@username" required />
-          </div>
-          <div class="field">
-            <label for="login-password">Пароль</label>
-            <input id="login-password" type="password" autocomplete="current-password" placeholder="Минимум 8 символов" required minlength="8" />
-          </div>
-          <button type="submit" class="btn primary">Войти</button>
-        </form>
-        <form id="form-register" class="auth-form hidden">
-          <div class="field">
-            <label for="reg-name">Отображаемое имя</label>
-            <input id="reg-name" placeholder="Как вас зовут" required />
-          </div>
-          <div class="field">
-            <label for="reg-username">Имя пользователя</label>
-            <input id="reg-username" autocomplete="username" placeholder="@username" required minlength="3" />
-          </div>
-          <div class="field">
-            <label for="reg-password">Пароль</label>
-            <input id="reg-password" type="password" autocomplete="new-password" placeholder="Минимум 8 символов" required minlength="8" />
-          </div>
-          <button type="submit" class="btn primary">Создать аккаунт</button>
-        </form>
-        <p id="auth-error" class="error hidden"></p>
-      </div>
-    </section>
-
-    <section id="view-main" class="view main-view hidden">
-      <aside class="sidebar" id="sidebar">
-        <header class="chats-header">
-          <h1 id="label-chats-title">Чаты</h1>
-          <button type="button" class="icon-btn" id="btn-chats-menu" title="Меню" aria-label="Меню">
-            <svg class="ico"><use href="/assets/icons.svg#ico-more"/></svg>
-          </button>
-        </header>
-        <div class="account-strip">
-          <div class="avatar" id="me-avatar">?</div>
-          <div class="account-text">
-            <div class="me-name" id="me-name">—</div>
-            <div class="me-user" id="me-username">@—</div>
-          </div>
-          <button type="button" class="icon-btn subtle" id="btn-localization" title="Локализация" aria-label="Локализация">
-            <svg class="ico"><use href="/assets/icons.svg#ico-type"/></svg>
-          </button>
-          <button type="button" class="icon-btn subtle" id="btn-logout" title="Выйти" aria-label="Выйти">
-            <svg class="ico"><use href="/assets/icons.svg#ico-logout"/></svg>
-          </button>
-        </div>
-        <div class="search-wrap" id="search-wrap">
-          <svg class="ico search-ico"><use href="/assets/icons.svg#ico-search"/></svg>
-          <input id="search-users" type="search" placeholder="Поиск по имени или @username" />
-          <div id="search-results" class="search-results hidden"></div>
-        </div>
-        <div id="chat-list" class="chat-list"></div>
-        <nav class="tab-bar" aria-label="Основная навигация">
-          <button type="button" class="tab-item active" id="nav-chats" data-panel="chats">
-            <svg class="ico"><use href="/assets/icons.svg#ico-chats"/></svg>
-            <span id="label-nav-chats">Чаты</span>
-          </button>
-          <button type="button" class="tab-item" id="nav-contacts" data-panel="contacts">
-            <svg class="ico"><use href="/assets/icons.svg#ico-user"/></svg>
-            <span>Контакты</span>
-          </button>
-          <button type="button" class="tab-item" id="nav-profile" data-panel="profile">
-            <svg class="ico"><use href="/assets/icons.svg#ico-user"/></svg>
-            <span id="label-nav-profile">Вы</span>
-          </button>
-          <button type="button" class="tab-item" id="nav-settings" data-panel="settings">
-            <svg class="ico"><use href="/assets/icons.svg#ico-settings"/></svg>
-            <span id="label-nav-settings">Настройки</span>
-          </button>
-          <button type="button" class="tab-item" id="nav-calls" data-panel="calls">
-            <svg class="ico"><use href="/assets/icons.svg#ico-chats"/></svg>
-            <span>Звонки</span>
-          </button>
-        </nav>
-        <div id="panel-contacts" class="side-panel hidden">
-          <p class="panel-hint">Контакты — найдите пользователя через поиск выше</p>
-        </div>
-        <div id="panel-settings" class="side-panel hidden">
-          <div class="settings-list">
-            <button type="button" class="settings-row hidden" id="web-btn-admin">Панель владельца</button>
-            <button type="button" class="settings-row" id="web-btn-locale">Локализация</button>
-            <button type="button" class="settings-row" id="web-btn-logout2">Выйти</button>
-          </div>
-        </div>
-        <div id="panel-profile" class="side-panel hidden">
-          <div class="profile-card">
-            <div class="avatar lg" id="profile-avatar">?</div>
-            <div class="me-name" id="profile-name">—</div>
-            <div class="me-user" id="profile-username">@—</div>
-          </div>
-        </div>
-        <div id="panel-calls" class="side-panel hidden">
-          <p class="panel-hint">История звонков появится здесь</p>
-        </div>
-      </aside>
-
-      <main class="chat-pane" id="chat-pane">
-        <div class="empty-chat" id="empty-chat">
-          <svg class="empty-graphic"><use href="/assets/icons.svg#ico-messages"/></svg>
-          <p class="empty-title">Выберите диалог</p>
-          <p class="empty-sub">Найдите собеседника через поиск слева</p>
-        </div>
-        <div class="chat-active hidden" id="chat-active">
-          <header class="chat-header">
-            <button type="button" class="icon-btn mobile-only" id="btn-back" aria-label="Назад">
-              <svg class="ico"><use href="/assets/icons.svg#ico-back"/></svg>
-            </button>
-            <div class="avatar sm" id="peer-avatar">?</div>
-            <div class="chat-header-info">
-              <div class="chat-title" id="chat-title">—</div>
-              <div class="chat-sub" id="chat-sub">—</div>
-            </div>
-          </header>
-          <div class="messages" id="messages"></div>
-          <form class="composer" id="composer">
-            <input id="message-input" placeholder="Сообщение" autocomplete="off" maxlength="4096" />
-            <button type="submit" class="btn send" aria-label="Отправить">
-              <svg class="ico"><use href="/assets/icons.svg#ico-send"/></svg>
-            </button>
-          </form>
-        </div>
-      </main>
-    </section>
-
-    <div id="menu-overlay" class="overlay hidden">
-      <div class="sheet">
-        <div class="sheet-handle"></div>
-        <button type="button" class="sheet-item" data-action="search">
-          <svg class="ico"><use href="/assets/icons.svg#ico-search"/></svg>
-          <span id="menu-search">Поиск</span>
-        </button>
-        <button type="button" class="sheet-item" data-action="archive">
-          <svg class="ico"><use href="/assets/icons.svg#ico-archive"/></svg>
-          <span id="menu-archive">Архив</span>
-        </button>
-        <button type="button" class="sheet-item" data-action="read-all">
-          <svg class="ico"><use href="/assets/icons.svg#ico-check-all"/></svg>
-          <span id="menu-read-all">Прочитать все</span>
-        </button>
-        <button type="button" class="sheet-item" data-action="select">
-          <svg class="ico"><use href="/assets/icons.svg#ico-select"/></svg>
-          <span id="menu-select">Выбрать чаты</span>
-        </button>
-      </div>
-    </div>
-
-    <div id="admin-modal" class="modal hidden">
-      <div class="modal-card admin-modal-card">
-        <header class="modal-header">
-          <button type="button" class="btn text danger" id="admin-close">Закрыть</button>
-          <h2>Панель владельца</h2>
-          <button type="button" class="btn text" id="admin-refresh">Обновить</button>
-        </header>
-        <div class="admin-stats" id="admin-stats">
-          <p class="panel-hint">Загрузка…</p>
-        </div>
-      </div>
-    </div>
-
-    <div id="locale-modal" class="modal hidden">
-      <div class="modal-card">
-        <header class="modal-header">
-          <button type="button" class="btn text danger" id="locale-close">Закрыть</button>
-          <h2 id="label-locale-title">Локализация</h2>
-          <button type="button" class="btn text danger" id="locale-reset">Сбросить</button>
-        </header>
-        <div class="locale-list" id="locale-list"></div>
-      </div>
-    </div>
-
-    <div id="edit-overlay" class="modal hidden">
-      <div class="edit-dialog">
-        <h2 id="label-edit">Изменить надпись</h2>
-        <p id="edit-original" class="edit-original"></p>
-        <input id="edit-input" />
-        <div class="edit-dialog-actions">
-          <button type="button" class="btn text danger" id="edit-cancel">Отмена</button>
-          <button type="button" class="btn text" id="edit-save">Сохранить</button>
-        </div>
-      </div>
-    </div>
+  <h1>Teleport — эталон дизайна</h1>
+  <p class="sub">
+    Актуальный стиль: тёмный V6 (#0A0A12), Manrope, синий акцент, валюта <b>Искры</b>,
+    нижняя навигация: <b>Контакты → Чаты → Настройки</b>.
+  </p>
+  <div class="warn">
+    Старый каталог «27 экранов SlimChat» (чёрный iOS) — <b>не эталон</b>. Смотрите только карточки с меткой V6.
   </div>
-  <script src="/assets/app.js"></script>
+  <div class="grid">
+    <a class="card" href="http://127.0.0.1:8769/">
+      <span class="tag">V6 · ОСНОВНОЙ</span>
+      <div class="title">Интерактивный мессенджер</div>
+      <div class="desc">Чаты, контакты, настройки, искры, админ — живой телефон</div>
+    </a>
+    <a class="card" href="http://127.0.0.1:8769/nav-preview.html">
+      <span class="tag">V6</span>
+      <div class="title">Нижняя навигация</div>
+      <div class="desc">Pill-бар как в Telegram: Контакты · Чаты · Настройки</div>
+    </a>
+    <a class="card" href="http://127.0.0.1:8769/settings-preview.html">
+      <span class="tag">V6</span>
+      <div class="title">Настройки</div>
+      <div class="desc">Карточки, баланс искр, профиль</div>
+    </a>
+    <a class="card" href="../design-mockups/chats-menu/teleport-chat-list-web.html">
+      <span class="tag">V6</span>
+      <div class="title">Список чатов</div>
+      <div class="desc">Поиск + фильтры + compose</div>
+    </a>
+    <a class="card" href="showcase.html">
+      <span class="tag old">УСТАРЕЛО</span>
+      <div class="title">Старый showcase SlimChat</div>
+      <div class="desc">Не используйте как референс дизайна</div>
+    </a>
+  </div>
 </body>
 </html>

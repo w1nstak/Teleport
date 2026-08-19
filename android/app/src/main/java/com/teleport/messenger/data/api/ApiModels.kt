@@ -33,6 +33,7 @@ data class UserDto(
     val displayName: String,
     val username: String?,
     val bio: String = "",
+    val status: String = "",
     val isOnline: Boolean = false,
     val lastSeen: Long = 0,
     val isPremium: Boolean = false,
@@ -89,6 +90,7 @@ data class UpdateProfileRequest(
     val displayName: String? = null,
     val username: String? = null,
     val bio: String? = null,
+    val status: String? = null,
 )
 
 @Serializable

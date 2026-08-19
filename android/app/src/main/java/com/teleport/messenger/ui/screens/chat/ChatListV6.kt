@@ -1,16 +1,20 @@
 package com.teleport.messenger.ui.screens.chat
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -27,10 +31,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.teleport.messenger.data.entity.ChatEntity
+import com.teleport.messenger.data.entity.ChatFolderEntity
 import com.teleport.messenger.data.entity.ChatType
 import com.teleport.messenger.ui.strings.AppStringKey
 import com.teleport.messenger.ui.strings.appStr
-import kotlin.math.absoluteValue
+import com.teleport.messenger.ui.theme.pressScaleWith
 
 object ChatListV6Palette {
     val Bg = Color(0xFF0A0A12)
@@ -101,6 +106,8 @@ fun ChatListV6TopBar(
     query: String,
     onQueryChange: (String) -> Unit,
     onCompose: () -> Unit,
+    onArchive: (() -> Unit)? = null,
+    onCalls: (() -> Unit)? = null,
 ) {
     Row(
         Modifier
@@ -138,6 +145,32 @@ fun ChatListV6TopBar(
                 },
             )
         }
+        if (onCalls != null) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(ChatListV6Palette.FieldBg)
+                    .border(1.dp, ChatListV6Palette.FieldBorder, RoundedCornerShape(12.dp))
+                    .clickable(onClick = onCalls),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.Phone, null, tint = ChatListV6Palette.TextMuted, modifier = Modifier.size(18.dp))
+            }
+        }
+        if (onArchive != null) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(ChatListV6Palette.FieldBg)
+                    .border(1.dp, ChatListV6Palette.FieldBorder, RoundedCornerShape(12.dp))
+                    .clickable(onClick = onArchive),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.Archive, null, tint = ChatListV6Palette.TextMuted, modifier = Modifier.size(18.dp))
+            }
+        }
         Box(
             Modifier
                 .size(40.dp)
@@ -155,20 +188,34 @@ fun ChatListV6TopBar(
 fun ChatListV6Filters(
     selected: ChatListFilter,
     onSelect: (ChatListFilter) -> Unit,
+    folders: List<ChatFolderEntity> = emptyList(),
+    selectedFolderId: String? = null,
+    onFolderSelect: (String?) -> Unit = {},
 ) {
-    val chips = listOf(
-        ChatListFilter.All to "Все",
-        ChatListFilter.Unread to "Непрочитанные",
-        ChatListFilter.Groups to "Группы",
-    )
+    val chips = buildList {
+        add(Triple("filter_all", "Все", null as String?))
+        add(Triple("filter_unread", "Непрочитанные", null))
+        add(Triple("filter_groups", "Группы", null))
+        folders.forEach { add(Triple("folder_${it.id}", it.name, it.id)) }
+    }
     LazyRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.padding(bottom = 14.dp),
     ) {
         items(chips.size) { i ->
-            val (filter, label) = chips[i]
-            val active = filter == selected
+            val (key, label, folderId) = chips[i]
+            val isFolder = folderId != null
+            val active = if (isFolder) {
+                selectedFolderId == folderId
+            } else {
+                selectedFolderId == null && when (key) {
+                    "filter_all" -> selected == ChatListFilter.All
+                    "filter_unread" -> selected == ChatListFilter.Unread
+                    "filter_groups" -> selected == ChatListFilter.Groups
+                    else -> false
+                }
+            }
             Box(
                 Modifier
                     .clip(RoundedCornerShape(12.dp))
@@ -185,7 +232,20 @@ fun ChatListV6Filters(
                                 .border(1.dp, ChatListV6Palette.FieldBorder, RoundedCornerShape(12.dp))
                         },
                     )
-                    .clickable { onSelect(filter) }
+                    .clickable {
+                        if (isFolder) {
+                            onFolderSelect(folderId)
+                        } else {
+                            onFolderSelect(null)
+                            onSelect(
+                                when (key) {
+                                    "filter_unread" -> ChatListFilter.Unread
+                                    "filter_groups" -> ChatListFilter.Groups
+                                    else -> ChatListFilter.All
+                                },
+                            )
+                        }
+                    }
                     .padding(horizontal = 16.dp, vertical = 7.dp),
             ) {
                 Text(
@@ -207,25 +267,32 @@ fun ChatListV6Item(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    isOnline: Boolean = false,
 ) {
     val time = remember(chat.lastMessageTime) { formatChatListTime(chat.lastMessageTime) }
     val gradient = avatarGradients[index % avatarGradients.size]
     val initials = remember(chat.title) { chatInitials(chat.title) }
-    val showOnline = remember(chat.id, chat.type) {
-        chat.type == ChatType.PRIVATE &&
-            !chat.id.startsWith("welcome_") &&
-            chat.id.hashCode().absoluteValue % 3 != 0
-    }
     val timeColor = if (chat.unreadCount > 0) ChatListV6Palette.NavActive else ChatListV6Palette.NavInactive
+    val interaction = remember { MutableInteractionSource() }
     val clickModifier = if (onLongClick != null) {
-        Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+        Modifier.combinedClickable(
+            interactionSource = interaction,
+            indication = null,
+            onClick = onClick,
+            onLongClick = onLongClick,
+        )
     } else {
-        Modifier.clickable(onClick = onClick)
+        Modifier.clickable(
+            interactionSource = interaction,
+            indication = null,
+            onClick = onClick,
+        )
     }
 
     Row(
         modifier
             .fillMaxWidth()
+            .pressScaleWith(interaction)
             .then(clickModifier)
             .padding(horizontal = 6.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -240,7 +307,7 @@ fun ChatListV6Item(
             ) {
                 Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
-            if (showOnline) {
+            if (isOnline) {
                 Box(
                     Modifier
                         .align(Alignment.BottomEnd)

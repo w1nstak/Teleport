@@ -1,7 +1,9 @@
 package com.teleport.messenger.ui.components
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -16,6 +18,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -27,8 +32,11 @@ import com.teleport.messenger.data.entity.MessageEntity
 import com.teleport.messenger.data.entity.MessageType
 import com.teleport.messenger.ui.strings.AppStringKey
 import com.teleport.messenger.ui.strings.appStr
+import com.teleport.messenger.ui.theme.LocalChatAccent
 import com.teleport.messenger.ui.theme.TeleportAppTheme
+import com.teleport.messenger.ui.theme.TeleportMotion
 import com.teleport.messenger.ui.theme.PremiumGold
+import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
 @Composable
@@ -81,11 +89,11 @@ fun ChatListItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
+    isOnline: Boolean = false,
 ) {
     val time = remember(chat.lastMessageTime) {
         com.teleport.messenger.ui.screens.chat.formatRelativeTime(chat.lastMessageTime)
     }
-    val isOnline = remember(chat.id) { chat.id.hashCode() % 3 != 0 }
     Row(
         modifier
             .fillMaxWidth()
@@ -147,39 +155,98 @@ fun MessageBubble(
     replyTo: MessageEntity? = null,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
+    largeFont: Boolean = false,
+    animateEnter: Boolean = false,
 ) {
     var spoilerRevealed by remember { mutableStateOf(!message.hasSpoiler) }
-    val colors = TeleportAppTheme.colors
-    val bg = if (isOwn) colors.bubbleOutgoing else colors.bubbleIncoming
-    val fg = if (isOwn) Color.White else colors.textPrimary
-    val align = if (isOwn) Alignment.CenterEnd else Alignment.CenterStart
-    val shape = RoundedCornerShape(22.dp)
+    val palette = com.teleport.messenger.ui.screens.chat.ConversationPalette
+    val accent = LocalChatAccent.current
+    val bodySize = if (largeFont) 15.5.sp else 13.5.sp
     val time = remember(message.createdAt) {
         com.teleport.messenger.ui.screens.chat.formatMessageTime(message.createdAt)
     }
+    val shape = if (isOwn) {
+        RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 6.dp)
+    } else {
+        RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 6.dp, bottomEnd = 18.dp)
+    }
+    val fg = if (isOwn) Color.White else palette.Text
+
+    val alpha = remember(message.id) { Animatable(if (animateEnter) 0f else 1f) }
+    val offsetY = remember(message.id) { Animatable(if (animateEnter) 18f else 0f) }
+    LaunchedEffect(message.id, animateEnter) {
+        if (animateEnter) {
+            launch {
+                alpha.animateTo(1f, animationSpec = TeleportMotion.normal())
+            }
+            launch {
+                offsetY.animateTo(0f, animationSpec = TeleportMotion.snappy())
+            }
+        } else {
+            alpha.snapTo(1f)
+            offsetY.snapTo(0f)
+        }
+    }
 
     Column(
-        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                this.alpha = alpha.value
+                translationY = offsetY.value
+            }
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalAlignment = if (isOwn) Alignment.End else Alignment.Start,
     ) {
-        Surface(
-            modifier = Modifier.widthIn(max = 280.dp).clickable { onLongClick() },
-            shape = shape,
-            color = bg,
-            shadowElevation = if (isOwn) 0.dp else 2.dp,
+        Box(
+            Modifier
+                .widthIn(max = 280.dp)
+                .then(
+                    if (isOwn) {
+                        Modifier
+                            .shadow(
+                                elevation = 6.dp,
+                                shape = shape,
+                                ambientColor = accent.primary.copy(0.28f),
+                                spotColor = accent.primary.copy(0.28f),
+                            )
+                            .clip(shape)
+                            .background(
+                                Brush.linearGradient(listOf(accent.primary, accent.secondary)),
+                            )
+                    } else {
+                        Modifier
+                            .clip(shape)
+                            .background(palette.Card)
+                            .border(1.dp, palette.Hairline, shape)
+                    },
+                )
+                .clickable { onLongClick() }
+                .padding(horizontal = 13.dp, vertical = 10.dp),
         ) {
-            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Column {
                 if (message.forwardFromId != null) {
-                    Text("Переслано", style = MaterialTheme.typography.labelSmall, color = fg.copy(0.7f))
+                    Text(
+                        "Переслано",
+                        fontSize = 11.sp,
+                        color = fg.copy(0.7f),
+                        fontFamily = com.teleport.messenger.ui.theme.ManropeFontFamily,
+                    )
                 }
                 replyTo?.let {
-                    Surface(color = fg.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp)) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(fg.copy(alpha = 0.12f))
+                            .padding(8.dp),
+                    ) {
                         Text(
                             it.text.ifEmpty { it.type.name },
                             maxLines = 2,
-                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 12.sp,
                             color = fg.copy(0.85f),
-                            modifier = Modifier.padding(8.dp),
+                            fontFamily = com.teleport.messenger.ui.theme.ManropeFontFamily,
                         )
                     }
                     Spacer(Modifier.height(6.dp))
@@ -187,42 +254,133 @@ fun MessageBubble(
                 when (message.type) {
                     MessageType.TEXT -> {
                         if (message.hasSpoiler && !spoilerRevealed) {
-                            Text("Спойлер — нажмите", color = fg, modifier = Modifier.clickable { spoilerRevealed = true })
+                            Text(
+                                "Спойлер — нажмите",
+                                color = fg,
+                                fontSize = bodySize,
+                                fontFamily = com.teleport.messenger.ui.theme.ManropeFontFamily,
+                                modifier = Modifier.clickable { spoilerRevealed = true },
+                            )
                         } else {
-                            Text(message.text, color = fg, lineHeight = 20.sp)
+                            Text(
+                                message.text,
+                                color = fg,
+                                fontSize = bodySize,
+                                lineHeight = 20.sp,
+                                fontFamily = com.teleport.messenger.ui.theme.ManropeFontFamily,
+                            )
                         }
                     }
                     MessageType.PHOTO -> {
                         message.mediaUri?.let { uri ->
+                            val ctx = androidx.compose.ui.platform.LocalContext.current
                             coil.compose.AsyncImage(
                                 model = uri,
                                 contentDescription = null,
-                                modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp).clip(RoundedCornerShape(12.dp)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 220.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        runCatching {
+                                            ctx.startActivity(
+                                                android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                                    setDataAndType(android.net.Uri.parse(uri), "image/*")
+                                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                },
+                                            )
+                                        }
+                                    },
                             )
                         } ?: Text("Фото", color = fg, fontSize = 14.sp)
-                        if (message.text.isNotEmpty()) Text(message.text, color = fg)
+                        if (message.text.isNotEmpty()) {
+                            Text(message.text, color = fg, fontSize = 13.5.sp)
+                        }
                     }
-                    MessageType.VOICE -> VoiceMessageContent(message.durationMs, isOwn, message.mediaUri)
-                    MessageType.VIDEO, MessageType.VIDEO_NOTE -> Text("Видео", color = fg, fontSize = 14.sp)
+                    MessageType.VOICE -> {
+                        VoiceMessageContent(message.durationMs, isOwn, message.mediaUri)
+                        message.transcription?.takeIf { it.isNotBlank() }?.let { text ->
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text,
+                                color = fg.copy(0.85f),
+                                fontSize = 12.5.sp,
+                                fontFamily = com.teleport.messenger.ui.theme.ManropeFontFamily,
+                            )
+                        }
+                    }
+                    MessageType.VIDEO, MessageType.VIDEO_NOTE -> VideoMessageContent(message.mediaUri, isOwn)
                     MessageType.GIF -> Text("GIF", color = fg, fontSize = 14.sp)
-                    MessageType.DOCUMENT, MessageType.FILE -> Text(message.fileName ?: "Файл", color = fg, fontSize = 14.sp)
+                    MessageType.DOCUMENT, MessageType.FILE -> {
+                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                        Row(
+                            Modifier.clickable {
+                                val uri = message.mediaUri ?: return@clickable
+                                runCatching {
+                                    ctx.startActivity(
+                                        android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                            setDataAndType(android.net.Uri.parse(uri), "*/*")
+                                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        },
+                                    )
+                                }
+                            },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Default.InsertDriveFile, null, tint = fg, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(message.fileName ?: "Файл", color = fg, fontSize = 14.sp)
+                        }
+                    }
                     MessageType.MUSIC -> Text(message.text.ifEmpty { "Аудио" }, color = fg, fontSize = 14.sp)
                     MessageType.CONTACT -> Text(message.contactName ?: "Контакт", color = fg, fontSize = 14.sp)
-                    MessageType.LOCATION -> Text("Местоположение", color = fg, fontSize = 14.sp)
+                    MessageType.LOCATION -> {
+                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                        val label = if (message.latitude != null && message.longitude != null) {
+                            "📍 ${"%.4f".format(message.latitude)}, ${"%.4f".format(message.longitude)}"
+                        } else {
+                            message.text.ifEmpty { "Местоположение" }
+                        }
+                        Text(
+                            label,
+                            color = fg,
+                            fontSize = 14.sp,
+                            modifier = Modifier.clickable {
+                                val lat = message.latitude ?: return@clickable
+                                val lon = message.longitude ?: return@clickable
+                                runCatching {
+                                    ctx.startActivity(
+                                        android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse("geo:$lat,$lon?q=$lat,$lon"),
+                                        ),
+                                    )
+                                }
+                            },
+                        )
+                    }
                     MessageType.GIFT -> Text(message.text.ifEmpty { "Подарок" }, color = fg, fontSize = 14.sp)
-                    else -> Text(message.text.ifEmpty { message.type.name }, color = fg)
+                    else -> Text(message.text.ifEmpty { message.type.name }, color = fg, fontSize = 13.5.sp)
                 }
                 if (message.isEdited) {
-                    Text("изменено", style = MaterialTheme.typography.labelSmall, color = fg.copy(0.7f))
+                    Text(
+                        "изменено",
+                        fontSize = 10.sp,
+                        color = fg.copy(0.7f),
+                        fontFamily = com.teleport.messenger.ui.theme.ManropeFontFamily,
+                    )
                 }
+                Text(
+                    time,
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(top = 4.dp),
+                    fontSize = 10.sp,
+                    color = fg.copy(0.65f),
+                    fontFamily = com.teleport.messenger.ui.theme.ManropeFontFamily,
+                )
             }
         }
-        Text(
-            time,
-            modifier = Modifier.padding(top = 4.dp, start = 4.dp, end = 4.dp),
-            fontSize = 11.sp,
-            color = TeleportAppTheme.colors.textMuted,
-        )
     }
 }
 
@@ -287,6 +445,48 @@ private fun VoiceMessageContent(durationMs: Long, isOwn: Boolean, mediaUri: Stri
         }
         Spacer(Modifier.width(8.dp))
         Text(String.format("%02d:%02d", mins, secs), color = tint, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun VideoMessageContent(mediaUri: String?, isOwn: Boolean) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val tint = if (isOwn) Color.White else TeleportAppTheme.colors.accentBlue
+    if (mediaUri.isNullOrBlank()) {
+        Text("Видео", color = tint, fontSize = 14.sp)
+        return
+    }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(160.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.Black.copy(0.4f))
+            .clickable {
+                runCatching {
+                    val file = java.io.File(mediaUri.removePrefix("file://"))
+                    val uri = if (mediaUri.startsWith("content:") || mediaUri.startsWith("http")) {
+                        android.net.Uri.parse(mediaUri)
+                    } else if (file.exists()) {
+                        androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            file,
+                        )
+                    } else {
+                        android.net.Uri.parse(mediaUri)
+                    }
+                    context.startActivity(
+                        android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, "video/*")
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        },
+                    )
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Default.PlayArrow, "Смотреть", tint = Color.White, modifier = Modifier.size(48.dp))
     }
 }
 

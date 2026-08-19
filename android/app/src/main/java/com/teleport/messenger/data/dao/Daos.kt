@@ -123,8 +123,14 @@ interface ChatFolderDao {
     @Query("SELECT * FROM chat_folders WHERE accountId = :accountId ORDER BY sortOrder")
     fun observeByAccount(accountId: String): Flow<List<ChatFolderEntity>>
 
+    @Query("SELECT * FROM chat_folders WHERE id = :id")
+    suspend fun getById(id: String): ChatFolderEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(folder: ChatFolderEntity)
+
+    @Query("UPDATE chat_folders SET name = :name WHERE id = :id")
+    suspend fun rename(id: String, name: String)
 
     @Query("DELETE FROM chat_folders WHERE id = :id")
     suspend fun delete(id: String)
@@ -281,6 +287,9 @@ interface CallDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(call: CallEntity)
+
+    @Query("UPDATE calls SET endedAt = :endedAt, status = 'ended' WHERE chatId = :chatId AND status = 'active'")
+    suspend fun endActiveForChat(chatId: String, endedAt: Long)
 
     @Query("SELECT * FROM calls ORDER BY startedAt DESC LIMIT 50")
     fun observeRecent(): Flow<List<CallEntity>>

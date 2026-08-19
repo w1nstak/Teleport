@@ -210,9 +210,14 @@ fun PremiumScreen(vm: TeleportViewModel, onBack: () -> Unit) {
 
                             } else {
 
+                                val ctx = androidx.compose.ui.platform.LocalContext.current
+
                                 Button(
 
-                                    onClick = { vm.buyPremium(1) },
+                                    onClick = {
+                                        vm.buyPremium(1)
+                                        android.widget.Toast.makeText(ctx, "Демо: Premium на 1 месяц", android.widget.Toast.LENGTH_SHORT).show()
+                                    },
 
                                     modifier = Modifier.fillMaxWidth().height(52.dp),
 
@@ -226,17 +231,27 @@ fun PremiumScreen(vm: TeleportViewModel, onBack: () -> Unit) {
 
                                     Spacer(Modifier.width(8.dp))
 
-                                    Text("Подписаться — 1 месяц", fontWeight = FontWeight.SemiBold)
+                                    Text("Подписаться — 1 месяц (демо)", fontWeight = FontWeight.SemiBold)
 
                                 }
 
                                 Spacer(Modifier.height(10.dp))
 
-                                TextButton(onClick = { vm.buyPremium(12) }) {
+                                TextButton(onClick = {
+                                    vm.buyPremium(12)
+                                    android.widget.Toast.makeText(ctx, "Демо: Premium на 12 месяцев", android.widget.Toast.LENGTH_SHORT).show()
+                                }) {
 
-                                    Text("Годовая подписка", color = TeleportAppTheme.colors.accentBlue)
+                                    Text("Годовая подписка (демо)", color = TeleportAppTheme.colors.accentBlue)
 
                                 }
+
+                                Text(
+                                    "Оплата пока в демо-режиме",
+                                    color = TeleportAppTheme.colors.textMuted,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
 
                             }
 
@@ -261,6 +276,7 @@ fun PremiumScreen(vm: TeleportViewModel, onBack: () -> Unit) {
 fun IskryScreen(vm: TeleportViewModel, onBack: () -> Unit, onGift: () -> Unit) {
     val user by vm.currentUser().collectAsState(initial = null)
     val history by vm.starHistory(user?.id ?: "").collectAsState(initial = emptyList())
+    val context = androidx.compose.ui.platform.LocalContext.current
     val weekAgo = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }
     val weekDelta = remember(history) {
         history.filter { it.createdAt >= weekAgo && it.amount > 0 }.sumOf { it.amount }
@@ -269,6 +285,11 @@ fun IskryScreen(vm: TeleportViewModel, onBack: () -> Unit, onGift: () -> Unit) {
     fun buyPack(pack: IskryPack) {
         val total = pack.sparks + (pack.bonus ?: 0)
         vm.buyIskry(total.toLong())
+        android.widget.Toast.makeText(
+            context,
+            "Демо: +$total искр зачислено",
+            android.widget.Toast.LENGTH_SHORT,
+        ).show()
     }
 
     Scaffold(containerColor = IskryV6Palette.Bg) { padding ->
@@ -293,6 +314,22 @@ fun IskryScreen(vm: TeleportViewModel, onBack: () -> Unit, onGift: () -> Unit) {
                         packs = defaultIskryPacks,
                         onSelect = ::buyPack,
                     )
+                }
+                if (history.isNotEmpty()) {
+                    item {
+                        Text(
+                            "ИСТОРИЯ",
+                            modifier = Modifier.padding(start = 22.dp, top = 20.dp, bottom = 8.dp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = IskryV6Palette.Label,
+                            letterSpacing = 0.8.sp,
+                        )
+                    }
+                    items(history.take(20), key = { it.id }) { tx ->
+                        StarTransactionRow(tx)
+                    }
+                    item { Spacer(Modifier.height(24.dp)) }
                 }
             }
         }
@@ -647,108 +684,193 @@ private fun MarketplaceListingCard(listing: MarketplaceListingEntity, onBuy: () 
 
 
 @Composable
-
 fun CallScreen(vm: TeleportViewModel, chatId: String, type: String, onEnd: () -> Unit) {
-
     val chat by vm.chat(chatId).collectAsState(initial = null)
-
     val context = androidx.compose.ui.platform.LocalContext.current
-
     val app = context.applicationContext as com.teleport.messenger.TeleportApplication
-
     val connected by app.webRtc.connected.collectAsState()
-
+    val localTrack by app.webRtc.localVideo.collectAsState()
+    val remoteTrack by app.webRtc.remoteVideo.collectAsState()
     var muted by remember { mutableStateOf(false) }
-
     var videoOn by remember { mutableStateOf(true) }
+    var permissionsReady by remember { mutableStateOf(false) }
+    var permissionDenied by remember { mutableStateOf(false) }
+    val isVideo = type == "video"
 
-
-
-    DisposableEffect(chatId, type) {
-
-        val intent = android.content.Intent(context, com.teleport.messenger.service.CallService::class.java)
-
-            .putExtra("type", type)
-
-            .putExtra("chatId", chatId)
-
-        context.startForegroundService(intent)
-
-        onDispose {
-
-            context.stopService(intent)
-
-            app.webRtc.endCall()
-
-        }
-
+    val needed = remember(type) {
+        buildList {
+            add(android.Manifest.permission.RECORD_AUDIO)
+            if (isVideo) add(android.Manifest.permission.CAMERA)
+        }.toTypedArray()
     }
 
+    fun hasAll(): Boolean = needed.all {
+        androidx.core.content.ContextCompat.checkSelfPermission(context, it) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
 
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
+    ) { result ->
+        permissionsReady = result.values.all { it }
+        permissionDenied = !permissionsReady
+    }
 
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    LaunchedEffect(chatId, type) {
+        if (hasAll()) permissionsReady = true else permissionLauncher.launch(needed)
+    }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    DisposableEffect(chatId, type, permissionsReady) {
+        if (!permissionsReady) {
+            onDispose { }
+        } else {
+            val intent = android.content.Intent(context, com.teleport.messenger.service.CallService::class.java)
+                .putExtra("type", type)
+                .putExtra("chatId", chatId)
+            context.startForegroundService(intent)
+            onDispose {
+                context.stopService(intent)
+                app.webRtc.endCall()
+                vm.endActiveCall(chatId)
+            }
+        }
+    }
 
-            TeleportAvatar(chat?.title ?: "?", modifier = Modifier.size(120.dp), size = 120.dp)
-
-            Spacer(Modifier.height(24.dp))
-
-            Text(chat?.title ?: "", style = MaterialTheme.typography.headlineMedium)
-
-            Text(
-
-                when {
-
-                    connected -> "Соединено"
-
-                    else -> if (type == "video") "Видеозвонок…" else "Звонок…"
-
-                },
-
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-
-            )
-
-            Spacer(Modifier.height(48.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-
-                FilledIconButton(
-
-                    onClick = { muted = app.webRtc.toggleMute() },
-
-                    modifier = Modifier.size(56.dp),
-
-                ) { Icon(if (muted) Icons.Default.MicOff else Icons.Default.Mic, null) }
-
-                if (type == "video") {
-
-                    FilledIconButton(
-
-                        onClick = { videoOn = app.webRtc.toggleVideo() },
-
-                        modifier = Modifier.size(56.dp),
-
-                    ) { Icon(if (videoOn) Icons.Default.Videocam else Icons.Default.VideocamOff, null) }
-
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        when {
+            permissionDenied -> {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                    Text(
+                        if (isVideo) "Нужны микрофон и камера" else "Нужен доступ к микрофону",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    TextButton(onClick = { permissionLauncher.launch(needed) }) { Text("Разрешить") }
+                    TextButton(onClick = onEnd) { Text("Отмена") }
+                }
+            }
+            !permissionsReady -> CircularProgressIndicator(color = Color.White)
+            else -> {
+                if (isVideo) {
+                    val egl = app.webRtc.eglContext()
+                    if (egl != null) {
+                        androidx.compose.ui.viewinterop.AndroidView(
+                            factory = { ctx ->
+                                org.webrtc.SurfaceViewRenderer(ctx).also { view ->
+                                    view.init(egl, null)
+                                    view.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+                                    view.setEnableHardwareScaler(true)
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                            update = { view ->
+                                remoteTrack?.addSink(view)
+                                if (remoteTrack == null) localTrack?.addSink(view)
+                            },
+                            onRelease = { view ->
+                                runCatching {
+                                    remoteTrack?.removeSink(view)
+                                    localTrack?.removeSink(view)
+                                    view.release()
+                                }
+                            },
+                        )
+                        if (remoteTrack != null && localTrack != null) {
+                            androidx.compose.ui.viewinterop.AndroidView(
+                                factory = { ctx ->
+                                    org.webrtc.SurfaceViewRenderer(ctx).also { view ->
+                                        view.init(egl, null)
+                                        view.setMirror(true)
+                                        view.setZOrderMediaOverlay(true)
+                                        view.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(16.dp)
+                                    .width(110.dp)
+                                    .height(160.dp)
+                                    .clip(RoundedCornerShape(14.dp)),
+                                update = { view -> localTrack?.addSink(view) },
+                                onRelease = { view ->
+                                    runCatching {
+                                        localTrack?.removeSink(view)
+                                        view.release()
+                                    }
+                                },
+                            )
+                        }
+                    }
                 }
 
-                FilledIconButton(
-
-                    onClick = onEnd,
-
-                    modifier = Modifier.size(56.dp),
-
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.error),
-
-                ) { Icon(Icons.Default.CallEnd, null) }
-
+                Column(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(bottom = 48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    if (!isVideo || remoteTrack == null) {
+                        TeleportAvatar(chat?.title ?: "?", modifier = Modifier.size(100.dp), size = 100.dp)
+                        Spacer(Modifier.height(16.dp))
+                    }
+                    Text(
+                        chat?.title ?: "",
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        when {
+                            connected -> "Соединено"
+                            else -> if (isVideo) "Видеозвонок…" else "Звонок…"
+                        },
+                        color = Color.White.copy(0.7f),
+                    )
+                    Spacer(Modifier.height(36.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        FilledIconButton(
+                            onClick = { muted = app.webRtc.toggleMute() },
+                            modifier = Modifier.size(56.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = Color.White.copy(0.18f),
+                            ),
+                        ) { Icon(if (muted) Icons.Default.MicOff else Icons.Default.Mic, null, tint = Color.White) }
+                        if (isVideo) {
+                            FilledIconButton(
+                                onClick = { videoOn = app.webRtc.toggleVideo() },
+                                modifier = Modifier.size(56.dp),
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = Color.White.copy(0.18f),
+                                ),
+                            ) {
+                                Icon(
+                                    if (videoOn) Icons.Default.Videocam else Icons.Default.VideocamOff,
+                                    null,
+                                    tint = Color.White,
+                                )
+                            }
+                        }
+                        FilledIconButton(
+                            onClick = {
+                                vm.endActiveCall(chatId)
+                                onEnd()
+                            },
+                            modifier = Modifier.size(56.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                            ),
+                        ) { Icon(Icons.Default.CallEnd, null, tint = Color.White) }
+                    }
+                }
             }
-
         }
-
     }
-
 }
 
