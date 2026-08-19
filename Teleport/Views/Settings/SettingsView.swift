@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var tdlib: TDLibManager
 
     var body: some View {
         NavigationStack {
@@ -17,9 +17,9 @@ struct SettingsView: View {
                                     .foregroundColor(TeleportTheme.primaryColor)
                             )
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(authService.currentUser?.displayName ?? "User")
+                            Text(tdlib.currentUser?.firstName ?? "User")
                                 .font(.headline)
-                            Text(authService.currentUser?.phone ?? "")
+                            Text(tdlib.currentUser?.phoneNumber ?? "")
                                 .font(.subheadline)
                                 .foregroundColor(TeleportTheme.textSecondary)
                         }
@@ -43,7 +43,7 @@ struct SettingsView: View {
 
                 Section {
                     Button(role: .destructive) {
-                        authService.logout()
+                        tdlib.logout()
                     } label: {
                         Label("Выйти", systemImage: "rectangle.portrait.and.arrow.right")
                     }

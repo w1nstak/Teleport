@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct TeleportApp: App {
     @StateObject private var tdlib = TDLibManager.shared
+    @StateObject private var authService = AuthService()
 
     var body: some Scene {
         WindowGroup {
@@ -16,6 +17,7 @@ struct TeleportApp: App {
                 case .ready:
                     MainTabView()
                         .environmentObject(tdlib)
+                        .environmentObject(authService)
                 case .loggingOut, .closed:
                     TelegramLoginView()
                         .environmentObject(tdlib)

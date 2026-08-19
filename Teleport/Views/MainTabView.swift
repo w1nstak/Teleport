@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct MainTabView: View {
+    @EnvironmentObject var tdlib: TDLibManager
+
     var body: some View {
         TabView {
             ChatsListView()

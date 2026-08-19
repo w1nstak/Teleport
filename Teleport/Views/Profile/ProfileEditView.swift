@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ProfileEditView: View {
-    @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var tdlib: TDLibManager
     @State private var displayName: String = ""
     @State private var bio: String = ""
     @State private var username: String = ""
@@ -44,7 +44,7 @@ struct ProfileEditView: View {
                 }
 
                 Section("Телефон") {
-                    Text(authService.currentUser?.phone ?? "")
+                    Text(tdlib.currentUser?.phoneNumber ?? "")
                         .foregroundColor(TeleportTheme.textSecondary)
                 }
             }
@@ -56,16 +56,16 @@ struct ProfileEditView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Готово") {
-                        authService.currentUser?.displayName = displayName
-                        authService.currentUser?.bio = bio.isEmpty ? nil : bio
+                        tdlib.updateProfile(firstName: displayName, lastName: "", bio: bio)
                         dismiss()
                     }
                     .bold()
                 }
             }
             .onAppear {
-                displayName = authService.currentUser?.displayName ?? ""
-                bio = authService.currentUser?.bio ?? ""
+                displayName = tdlib.currentUser?.firstName ?? ""
+                bio = tdlib.currentUser?.bio ?? ""
+                username = tdlib.currentUser?.username ?? ""
             }
         }
     }
